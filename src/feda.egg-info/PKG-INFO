@@ -1,0 +1,15 @@
+Metadata-Version: 2.1
+Name: feda
+Version: 0.0.1
+Summary: Foundation Edge Distillation Architecture
+Author-email: Daniele Affinita <daniele.affinita@sony.com>
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: torch
+Requires-Dist: numpy
+
+# FEDA
+Foundation Edge Distillation Architecture
+
+![UML Architecture](assets/FEDA_v1.1.png)

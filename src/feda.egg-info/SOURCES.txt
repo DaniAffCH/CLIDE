@@ -1,0 +1,16 @@
+.gitignore
+LICENSE
+README.md
+pyproject.toml
+assets/FEDA_v1.1.png
+src/main.py
+src/feda.egg-info/PKG-INFO
+src/feda.egg-info/SOURCES.txt
+src/feda.egg-info/dependency_links.txt
+src/feda.egg-info/requires.txt
+src/feda.egg-info/top_level.txt
+src/feda/abstractModels/__init__.py
+src/feda/abstractModels/model.py
+src/feda/concreteModels/__init__.py
+src/feda/managers/__init__.py
+src/feda/managers/hookManager.py
