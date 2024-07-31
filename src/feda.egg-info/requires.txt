@@ -1,2 +1,8 @@
+wheel
 torch
 numpy
+transformers
+overrides
+pillow
+einops
+timm

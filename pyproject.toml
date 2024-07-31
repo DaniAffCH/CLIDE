@@ -12,6 +12,12 @@ version = "0.0.1"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
+    "wheel",
     "torch",
-    "numpy"
+    "numpy",
+    "transformers",
+    "overrides",
+    "pillow",
+    "einops",
+    "timm"
 ]

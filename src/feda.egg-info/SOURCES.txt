@@ -11,6 +11,9 @@ src/feda.egg-info/requires.txt
 src/feda.egg-info/top_level.txt
 src/feda/abstractModels/__init__.py
 src/feda/abstractModels/model.py
+src/feda/abstractModels/studentModel.py
+src/feda/abstractModels/teacherModel.py
 src/feda/concreteModels/__init__.py
+src/feda/concreteModels/florence2.py
 src/feda/managers/__init__.py
 src/feda/managers/hookManager.py

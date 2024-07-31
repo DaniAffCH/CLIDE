@@ -6,8 +6,14 @@ Author-email: Daniele Affinita <daniele.affinita@sony.com>
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
 License-File: LICENSE
+Requires-Dist: wheel
 Requires-Dist: torch
 Requires-Dist: numpy
+Requires-Dist: transformers
+Requires-Dist: overrides
+Requires-Dist: pillow
+Requires-Dist: einops
+Requires-Dist: timm
 
 # FEDA
 Foundation Edge Distillation Architecture
