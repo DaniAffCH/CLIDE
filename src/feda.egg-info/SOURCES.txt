@@ -2,6 +2,7 @@
 LICENSE
 README.md
 pyproject.toml
+setup.sh
 assets/FEDA_v1.1.png
 src/main.py
 src/feda.egg-info/PKG-INFO

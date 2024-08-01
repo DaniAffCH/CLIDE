@@ -15,20 +15,30 @@ class FlorenceModelType(Enum):
 
 
 class Florence2(TeacherModel):
-    def __init__(self, modelType: FlorenceModelType) -> None:
+    def __init__(self, modelType: FlorenceModelType, maxNewTokens: int = 1024, numBeams = 3) -> None:
         isVLM = True
         name = modelType.value.split("/")[-1]
 
         self.dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         self._processor = AutoProcessor.from_pretrained(modelType.value, trust_remote_code=True)
+        self.maxNewTokens = maxNewTokens
+        self.numBeams = numBeams
 
         model = AutoModelForCausalLM.from_pretrained(modelType.value, torch_dtype=self.dtype, trust_remote_code=True)
 
         super().__init__(model, name, isVLM)
 
     @override
-    def forward(self, inputs: ImageInput) -> Dict[str, torch.Tensor]:
-        processed_inputs = self._processor(text=self.prompt, images=inputs, return_tensors="pt")
-        print(type(processed_inputs))
-        # TODO: won't work 
-        return super().forward(processed_inputs)
+    def _preprocess(self, *inputs: ImageInput) -> torch.Tensor:
+        return self._processor(text=self.prompt, images=inputs, return_tensors="pt").to(self._device, self.dtype)
+    
+    def _inference(self, processed_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
+        generated_ids = self._model.generate(
+            input_ids=processed_inputs["input_ids"],
+            pixel_values=processed_inputs["pixel_values"],
+            max_new_tokens=self.maxNewTokens,
+            num_beams=self.numBeams,
+            do_sample=False
+        )
+
+        return generated_ids

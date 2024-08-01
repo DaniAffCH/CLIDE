@@ -1,8 +1,9 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import List, Dict
 import torch
 from torch import nn
 from feda.managers.hookManager import HookManager
+from transformers.image_utils import ImageInput
 
 class Model(ABC):
 
@@ -13,6 +14,8 @@ class Model(ABC):
         # Size expressed in bytes
         self._size = self._computeModelSize()
         self._hookManager = HookManager(model)
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._model.to(self._device)
 
     def _computeModelSize(self) -> int:
         size_model = 0
@@ -30,6 +33,10 @@ class Model(ABC):
     @property
     def size(self) -> int:
         return self._size
+    
+    @property
+    def device(self) -> torch.device:
+        return self._device
 
     @model.setter
     def model(self, model: nn.Module) -> None:
@@ -41,8 +48,16 @@ class Model(ABC):
     def registerHooks(self, hookList: List[str]) -> None:
         self._hookManager.registerHooks(hookList)
 
-    def forward(self, *inputs: torch.Tensor) -> Dict[str, torch.Tensor]:
-        output = self._model(*inputs)
+    @abstractmethod
+    def _preprocess(self, *inputs: ImageInput) -> torch.Tensor:
+        pass
+
+    def _inference(self, processed_inputs: torch.Tensor) -> torch.Tensor:
+        return self._model(processed_inputs)
+
+    def forward(self, *inputs: ImageInput) -> Dict[str, torch.Tensor]:
+        processed_inputs = self._preprocess(*inputs)
+        output = self._inference(processed_inputs)
         output_hooks = self._forwardHooks()
         output_hooks["output"] = output
         return output_hooks
