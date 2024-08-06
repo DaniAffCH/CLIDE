@@ -53,8 +53,6 @@ class DataManager:
 
         self._currentSize += imageSize
 
-        print(self._currentSize)
-
         # Store image using GridFS
         imageId = self._fs.put(imageBytes, filename=imageName)
 

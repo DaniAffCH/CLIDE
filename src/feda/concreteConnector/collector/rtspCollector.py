@@ -96,7 +96,6 @@ class RTSPCollector(RemoteCollector):
 
     def _writeData(self, image: np.ndarray):
         self._dataManager.addImage(image)
-        print("STORED")
 
     @override
     def poll(self) -> None:
