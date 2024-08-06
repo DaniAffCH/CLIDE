@@ -1,12 +1,27 @@
-from feda.concreteModels.florence2 import Florence2, FlorenceModelType
-
-import requests
-from PIL import Image
+from feda.concreteModel.teacher.florence2 import Florence2, FlorenceModelType
+from feda.concreteConnector.collector.rtspCollector import RTSPCollector, RTSPParams
+from feda.managers.dataManager import DataManager
 
 if __name__ == "__main__":
     m = Florence2(FlorenceModelType.FLORENCE_2_BASE)
-    m.prompt = "<OD>"
-    url = "https://cdn.apartmenttherapy.info/image/upload/f_jpg,q_auto:eco,c_fill,g_auto,w_1500,ar_4:3/k%2Farchive%2F7c7ef71dc7e19f1e9262bb724203a1014dc230e8"
-    image = Image.open(requests.get(url, stream=True).raw)
 
-    m.forward(image)
+    dataManager = DataManager(dbUri="mongodb://localhost:27017",
+                              dbName="testing_db",
+                              teacherModel=m,
+                              maxSize=100000000)
+    
+    rtspParams = RTSPParams(address="daxpytip1dec23.ddns.net",
+                            deviceName="DaxpyXXSettembre",
+                            dataManager=dataManager, 
+                            port="11001", 
+                            user="root", 
+                            dev_token="tina", 
+                            seek_period_s=300, 
+                            channel="ch0", 
+                            protocol="tcp", 
+                            timeout=10., 
+                            frame_res=(1920, 1080))
+    
+    collector = RTSPCollector(rtspParams)
+    collector.connect()
+    collector.poll()

@@ -19,5 +19,7 @@ dependencies = [
     "overrides",
     "pillow",
     "einops",
-    "timm"
+    "timm",
+    "pymongo", 
+    "av"
 ]

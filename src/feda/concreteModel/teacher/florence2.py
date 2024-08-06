@@ -1,5 +1,5 @@
 from torch.nn.modules import Module
-from feda.abstractModels.teacherModel import TeacherModel
+from feda.abstractModel.teacherModel import TeacherModel
 from enum import Enum
 from typing import Dict
 from transformers import AutoProcessor, AutoModelForCausalLM 

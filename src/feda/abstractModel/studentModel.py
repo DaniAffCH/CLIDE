@@ -1,5 +1,5 @@
 from torch.nn.modules import Module
-from feda.abstractModels.model import Model
+from feda.abstractModel.model import Model
 from abc import ABC
 import time
 

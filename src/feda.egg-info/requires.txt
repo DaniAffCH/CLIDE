@@ -6,3 +6,5 @@ overrides
 pillow
 einops
 timm
+pymongo
+av

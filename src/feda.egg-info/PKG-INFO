@@ -14,6 +14,8 @@ Requires-Dist: overrides
 Requires-Dist: pillow
 Requires-Dist: einops
 Requires-Dist: timm
+Requires-Dist: pymongo
+Requires-Dist: av
 
 # FEDA
 Foundation Edge Distillation Architecture
