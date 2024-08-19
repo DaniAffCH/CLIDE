@@ -1,6 +1,4 @@
 from feda.concreteModel.teacherPool import TeacherPool
-from feda.concreteConnector.collector.rtspCollector import RTSPCollector, RTSPParams
-from feda.managers.dataManager import DataManager
 from omegaconf import DictConfig, OmegaConf
 from enum import Enum
 import logging
