@@ -1,4 +1,4 @@
-from feda.abstractModel.teacherModel import TeacherModel
+from feda.concreteModel.teacherPool import TeacherPool
 from pymongo import MongoClient
 import gridfs
 from bson.objectid import ObjectId
@@ -6,16 +6,22 @@ from datetime import datetime
 import io
 from PIL import Image
 import numpy as np
+import logging
+import torch
 
+logger = logging.getLogger(__name__)
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherModel: TeacherModel, maxSize: int) -> None:
-        self._teacherModel = teacherModel
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: int) -> None:
+        logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
+        self._teacherPool = teacherPool
         self._maxSize = maxSize
         self._dbClient = MongoClient(dbUri)
         self._db = self._dbClient[dbName]
         self._fs = gridfs.GridFS(self._db)
         self._currentSize = self._calculateInitialSize()
         self.dbName = dbName
+        logger.info(f"Connection to db established")
+
 
     def _calculateInitialSize(self) -> int:
         total_size = 0
@@ -28,9 +34,11 @@ class DataManager:
         oldest = self._db.metadata.find_one(sort=[("upload_date", 1)])
         return oldest['_id'] if oldest else None
 
-    def _annotateImage(self):
-        # TODO: use a teacher to annotate 
-        return 1.
+    def _annotateImage(self, imageData: np.ndarray):
+        annotator = self._teacherPool.getRandomModel()
+        label = annotator.forward(torch.tensor(imageData))
+
+        return label
 
     def addImage(self, imageData: np.ndarray):
         # Convert np.ndarray to bytes
@@ -56,7 +64,7 @@ class DataManager:
         # Store image using GridFS
         imageId = self._fs.put(imageBytes, filename=imageName)
 
-        annotation = self._annotateImage()
+        annotation = self._annotateImage(imageData)
         
         # Store metadata and annotation
         metadata = {

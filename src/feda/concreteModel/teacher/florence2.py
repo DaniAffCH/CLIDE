@@ -1,4 +1,3 @@
-from torch.nn.modules import Module
 from feda.abstractModel.teacherModel import TeacherModel
 from enum import Enum
 from typing import Dict
@@ -29,7 +28,7 @@ class Florence2(TeacherModel):
         super().__init__(model, name, isVLM)
 
     @override
-    def _preprocess(self, *inputs: ImageInput) -> torch.Tensor:
+    def _preprocess(self, *inputs: ImageInput) -> Dict[str, torch.Tensor]:
         return self._processor(text=self.prompt, images=inputs, return_tensors="pt").to(self._device, self.dtype)
     
     def _inference(self, processed_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:

@@ -49,10 +49,10 @@ class Model(ABC):
         self._hookManager.registerHooks(hookList)
 
     @abstractmethod
-    def _preprocess(self, *inputs: ImageInput) -> torch.Tensor:
+    def _preprocess(self, *inputs: ImageInput) -> Dict[str, torch.Tensor]:
         pass
 
-    def _inference(self, processed_inputs: torch.Tensor) -> torch.Tensor:
+    def _inference(self, processed_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         return self._model(processed_inputs)
 
     def forward(self, *inputs: ImageInput) -> Dict[str, torch.Tensor]:

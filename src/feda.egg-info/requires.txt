@@ -8,3 +8,5 @@ einops
 timm
 pymongo
 av
+humanfriendly
+ultralytics

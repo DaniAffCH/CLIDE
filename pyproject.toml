@@ -21,5 +21,7 @@ dependencies = [
     "einops",
     "timm",
     "pymongo", 
-    "av"
+    "av",
+    "humanfriendly",
+    "ultralytics"
 ]

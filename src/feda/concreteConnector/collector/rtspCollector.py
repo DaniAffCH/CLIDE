@@ -4,9 +4,12 @@ from overrides import override
 import numpy as np
 import time 
 from typing import Tuple, Generator
-import warnings
 import av
 from dataclasses import dataclass
+import logging
+import subprocess
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class RTSPParams:
@@ -38,17 +41,22 @@ class RTSPCollector(RemoteCollector):
     @override
     def connect(self) -> bool:
         
+        if self.isAlive():
+            logger.info(f"Device {self.address} is reachable")
+        else:
+            raise AssertionError(f"Device {self.address} is not reachable")
+
         while not self._isConnected:
             try:
                 conn = (f"rtsp://{self._user}:{self._dev_token}@"
                         + f"{self.address}:{self._port}/"
                         + self._channel)
-                print("Connection at", conn)
+                logger.info(f"Attempting connection to RTSP streaming {conn}")
                 container = av.open(conn, format="rtsp",
                     options={"rtsp_transport": self._protocol},
                     timeout=self._timeout)
             except Exception as e:
-                print("Cannot connect:", e)
+                logger.warning("Cannot connect:", e)
                 time.sleep(1)
                 continue
 
@@ -56,6 +64,8 @@ class RTSPCollector(RemoteCollector):
             self._container = container
 
             self._sync_stream(check_diff=False, old_s=-1)
+
+        logger.info(f"Connection to RTSP streaming established.")
 
         return self._isConnected
 
@@ -73,7 +83,7 @@ class RTSPCollector(RemoteCollector):
                 if running_s % self._seek_period_s == 0:
                     sync = True
             if sync and old_s != running_s:
-                print("Synchronizing RTSP stream ...")
+                logger.info("Synchronizing RTSP stream.")
                 self._container.seek(-1)
         self.rs = running_s
         return sync
@@ -91,7 +101,7 @@ class RTSPCollector(RemoteCollector):
                 yield image
 
         except av.InvalidDataError as ave:
-            warnings.warn("Received invalid av data")
+            logger.warning("Received invalid av data.")
             yield np.empty(0)
 
     def _writeData(self, image: np.ndarray):
@@ -99,15 +109,33 @@ class RTSPCollector(RemoteCollector):
 
     @override
     def poll(self) -> None:
+        logger.info(f"Starting image streaming.")
         if not self._isConnected:
+            logger.critical("Attempted to poll data without a device connection.")
             raise AssertionError("Device is not connected.")
         for image in self._pollData():
             self._writeData(image)
 
     @override
     def isAlive(self) -> bool:
-        return True
+        try:
+            subprocess.run(['ping', "-c", '1', self.address], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=1)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+        except subprocess.TimeoutExpired:
+            return False
     
     @override
     def disconnect(self) -> bool:
-        return True
+        if self._container is not None:
+            self._container.close()
+        else:
+            logger.warning("No container to close for RTSP collector.")
+        self._container = None
+        self._isConnected = False
+
+        logger.info("RTSP connection closed.")
+
+        return self._isConnected
+
