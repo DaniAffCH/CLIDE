@@ -11,32 +11,29 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class RTSPParams:
-    address: str
-    deviceName: str
-    dataManager: DataManager
-    port: str
-    user: str
-    dev_token: str
-    seek_period_s: int
-    channel: str
-    protocol: str
-    timeout: float
-    frame_res: Tuple[int, int]
-
 class RTSPCollector(RemoteCollector):
-    def __init__(self, params: RTSPParams) -> None:
-        super().__init__(params.address, params.deviceName, params.dataManager)
-        self._port = params.port
-        self._user = params.user
-        self._dev_token = params.dev_token
-        self._seek_period_s = params.seek_period_s
+    def __init__(self, 
+                 address: str,
+                 deviceName: str,
+                 dataManager: DataManager,
+                 port: str,
+                 user: str,
+                 dev_token: str,
+                 seek_period_s: int,
+                 channel: str,
+                 protocol: str,
+                 timeout: float,
+                 frame_res: Tuple[int, int]) -> None:
+        super().__init__(address, deviceName, dataManager)
+        self._port = port
+        self._user = user
+        self._dev_token = dev_token
+        self._seek_period_s = seek_period_s
         self._tt_prev = None
-        self._channel = params.channel
-        self._protocol = params.protocol
-        self._timeout = params.timeout
-        self._frame_res = params.frame_res
+        self._channel = channel
+        self._protocol = protocol
+        self._timeout = timeout
+        self._frame_res = frame_res
 
     @override
     def connect(self) -> bool:
@@ -56,7 +53,7 @@ class RTSPCollector(RemoteCollector):
                     options={"rtsp_transport": self._protocol},
                     timeout=self._timeout)
             except Exception as e:
-                logger.warning("Cannot connect:", e)
+                logger.warning(f"Cannot connect: {e}")
                 time.sleep(1)
                 continue
 

@@ -1,0 +1,14 @@
+_target_: feda.concreteConnector.collector.rtspCollector.RTSPCollector
+
+address: "daxpytip1dec23.ddns.net"
+deviceName: "DaxpyXXSettembre"
+port: "11001"
+user: "root"
+dev_token: "tina"
+seek_period_s: 300
+channel: "ch0"
+protocol: "tcp"
+timeout: 10.0
+frame_res:
+  - 1920
+  - 1080

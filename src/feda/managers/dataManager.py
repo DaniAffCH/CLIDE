@@ -3,6 +3,7 @@ from pymongo import MongoClient
 import gridfs
 from bson.objectid import ObjectId
 from datetime import datetime
+import humanfriendly
 import io
 from PIL import Image
 import numpy as np
@@ -11,10 +12,10 @@ import torch
 
 logger = logging.getLogger(__name__)
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: int) -> None:
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
         self._teacherPool = teacherPool
-        self._maxSize = maxSize
+        self._maxSize = humanfriendly.parse_size(maxSize)
         self._dbClient = MongoClient(dbUri)
         self._db = self._dbClient[dbName]
         self._fs = gridfs.GridFS(self._db)

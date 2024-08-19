@@ -14,16 +14,17 @@ class FlorenceModelType(Enum):
 
 
 class Florence2(TeacherModel):
-    def __init__(self, modelType: FlorenceModelType, maxNewTokens: int = 1024, numBeams = 3) -> None:
+    def __init__(self, modelType: str, maxNewTokens: int = 1024, numBeams = 3) -> None:
         isVLM = True
-        name = modelType.value.split("/")[-1]
+        modelType = FlorenceModelType[modelType].value
+        name = modelType.split("/")[-1]
 
         self.dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-        self._processor = AutoProcessor.from_pretrained(modelType.value, trust_remote_code=True)
+        self._processor = AutoProcessor.from_pretrained(modelType, trust_remote_code=True)
         self.maxNewTokens = maxNewTokens
         self.numBeams = numBeams
 
-        model = AutoModelForCausalLM.from_pretrained(modelType.value, torch_dtype=self.dtype, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(modelType, torch_dtype=self.dtype, trust_remote_code=True)
 
         super().__init__(model, name, isVLM)
 

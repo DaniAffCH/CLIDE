@@ -11,10 +11,11 @@ class YoloV8ModelType(Enum):
     YOLOV8S = "yolov8s.pt"
 
 class YoloV8(StudentModel):
-    def __init__(self, modelType: YoloV8ModelType) -> None:
-        name = modelType.value.split(".")[0]
+    def __init__(self, modelType: str) -> None:
+        modelType = YoloV8ModelType[modelType].value
+        name = modelType.split(".")[0]
 
-        model = YOLO(modelType.value, "detect")
+        model = YOLO(modelType, "detect")
 
         super().__init__(model, name)
 

@@ -18,6 +18,9 @@ Requires-Dist: pymongo
 Requires-Dist: av
 Requires-Dist: humanfriendly
 Requires-Dist: ultralytics
+Requires-Dist: cython
+Requires-Dist: omegaconf
+Requires-Dist: hydra-core
 
 # FEDA
 Foundation Edge Distillation Architecture

@@ -10,3 +10,6 @@ pymongo
 av
 humanfriendly
 ultralytics
+cython
+omegaconf
+hydra-core

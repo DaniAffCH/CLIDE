@@ -23,5 +23,8 @@ dependencies = [
     "pymongo", 
     "av",
     "humanfriendly",
-    "ultralytics"
+    "ultralytics",
+    "cython",
+    "omegaconf",
+    "hydra-core"
 ]
