@@ -2,6 +2,7 @@ from feda.abstractModel.teacherModel import TeacherModel
 from enum import Enum
 from typing import Dict
 from transformers import AutoProcessor, AutoModelForCausalLM 
+from feda.tasks.tasks import KeyMapping, TaskType, TaskResult, TaskFactory
 from transformers.image_utils import ImageInput
 from overrides import override
 import torch
@@ -23,14 +24,35 @@ class Florence2(TeacherModel):
         self._processor = AutoProcessor.from_pretrained(modelType, trust_remote_code=True)
         self.maxNewTokens = maxNewTokens
         self.numBeams = numBeams
+        self._image_size = None
 
         model = AutoModelForCausalLM.from_pretrained(modelType, torch_dtype=self.dtype, trust_remote_code=True)
-
         super().__init__(model, name, isVLM)
 
+        self._prompt = "<OD>" # TODO: this should be dependend on the type of task
+
     @override
-    def _preprocess(self, *inputs: ImageInput) -> Dict[str, torch.Tensor]:
+    def _getKeyMapping(self) -> KeyMapping:
+        mapping_dict = {
+            TaskType.DETECTION: TaskFactory.create_key_mapping(TaskType.DETECTION, bounding_boxes="bboxes", classes="labels")
+        }
+
+        return mapping_dict[self.taskType]
+    
+    @override
+    def _preprocess(self, inputs: ImageInput) -> Dict[str, torch.Tensor]:
+        self._image_size = (inputs.shape[-2], inputs.shape[-3])
         return self._processor(text=self.prompt, images=inputs, return_tensors="pt").to(self._device, self.dtype)
+    
+    @override
+    def _postprocess(self, outputs: torch.Tensor) -> TaskResult:
+        # TODO: make it batchable, currently just 1 elem
+        generatedText = self._processor.batch_decode(outputs, skip_special_tokens=False)[0]
+
+        postProcessed = self._processor.post_process_generation(generatedText, task=self.prompt, image_size=self._image_size)
+        postProcessed = postProcessed[self.prompt]
+
+        return TaskFactory.create_result(self.taskType, self._getKeyMapping(), postProcessed)
     
     def _inference(self, processed_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         generated_ids = self._model.generate(

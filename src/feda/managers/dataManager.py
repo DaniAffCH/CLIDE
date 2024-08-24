@@ -1,5 +1,6 @@
 from feda.concreteModel.teacherPool import TeacherPool
 from pymongo import MongoClient
+from typing import Dict
 import gridfs
 from bson.objectid import ObjectId
 from datetime import datetime
@@ -35,11 +36,12 @@ class DataManager:
         oldest = self._db.metadata.find_one(sort=[("upload_date", 1)])
         return oldest['_id'] if oldest else None
 
-    def _annotateImage(self, imageData: np.ndarray):
+    def _annotateImage(self, imageData: np.ndarray) -> Dict[str, torch.Tensor]:
         annotator = self._teacherPool.getRandomModel()
         label = annotator.forward(torch.tensor(imageData))
 
-        return label
+        # TODO: this should be related to the type of task. Assuming Detection for now
+        return label["output"].classes
 
     def addImage(self, imageData: np.ndarray):
         # Convert np.ndarray to bytes

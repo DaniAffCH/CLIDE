@@ -26,5 +26,6 @@ dependencies = [
     "ultralytics",
     "cython",
     "omegaconf",
-    "hydra-core"
+    "hydra-core",
+    "torchvision"
 ]
