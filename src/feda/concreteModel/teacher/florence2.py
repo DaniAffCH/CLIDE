@@ -1,12 +1,15 @@
 from feda.abstractModel.teacherModel import TeacherModel
 from enum import Enum
-from typing import Dict
+from typing import Dict, Any
 from transformers import AutoProcessor, AutoModelForCausalLM 
-from feda.tasks.tasks import KeyMapping, TaskType, TaskResult, TaskFactory
+from feda.adapters.tasks import KeyMapping, TaskType, TaskResult, TaskFactory
 from transformers.image_utils import ImageInput
+from feda.adapters.classes import ClassAdapter
 from overrides import override
+import logging
 import torch
 
+logger = logging.getLogger(__name__)
 class FlorenceModelType(Enum):
     FLORENCE_2_BASE = "microsoft/Florence-2-base"
     FLORENCE_2_LARGE = "microsoft/Florence-2-large"
@@ -24,7 +27,6 @@ class Florence2(TeacherModel):
         self._processor = AutoProcessor.from_pretrained(modelType, trust_remote_code=True)
         self.maxNewTokens = maxNewTokens
         self.numBeams = numBeams
-        self._image_size = None
 
         model = AutoModelForCausalLM.from_pretrained(modelType, torch_dtype=self.dtype, trust_remote_code=True)
         super().__init__(model, name, isVLM)
@@ -41,16 +43,30 @@ class Florence2(TeacherModel):
     
     @override
     def _preprocess(self, inputs: ImageInput) -> Dict[str, torch.Tensor]:
-        self._image_size = (inputs.shape[-2], inputs.shape[-3])
         return self._processor(text=self.prompt, images=inputs, return_tensors="pt").to(self._device, self.dtype)
     
     @override
-    def _postprocess(self, outputs: torch.Tensor) -> TaskResult:
+    def _getClassNameMapping(self) -> Dict[str, str]:
+        return {
+            "car": "car",
+            "bicycle": "bike",
+            "person": "person"
+        }
+    
+    @override
+    def _postprocess(self, outputs: Any) -> TaskResult:
         # TODO: make it batchable, currently just 1 elem
         generatedText = self._processor.batch_decode(outputs, skip_special_tokens=False)[0]
 
-        postProcessed = self._processor.post_process_generation(generatedText, task=self.prompt, image_size=self._image_size)
+        # normalized output
+        postProcessed = self._processor.post_process_generation(generatedText, task=self.prompt, image_size=(1,1))
         postProcessed = postProcessed[self.prompt]
+
+        mapping = self._getClassNameMapping()
+
+        # TODO: this won't work for batched inputs I guess
+        postProcessed["labels"], adaptation_mask = ClassAdapter.adaptClassesToId(postProcessed["labels"], mapping)
+        postProcessed["bboxes"] = [e for e, m in zip(postProcessed["bboxes"], adaptation_mask) if m] 
 
         return TaskFactory.create_result(self.taskType, self._getKeyMapping(), postProcessed)
     

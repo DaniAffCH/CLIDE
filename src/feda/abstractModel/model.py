@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from feda.managers.hookManager import HookManager
 from transformers.image_utils import ImageInput
-from feda.tasks.tasks import TaskType, KeyMapping, TaskResult
+from feda.adapters.tasks import TaskType, KeyMapping, TaskResult
 
 class Model(ABC):
 
@@ -60,11 +60,15 @@ class Model(ABC):
         pass
 
     @abstractmethod
+    def _getClassNameMapping(self) -> Dict[str, str]:
+        pass
+
+    @abstractmethod
     def _preprocess(self, inputs: ImageInput) -> Dict[str, torch.Tensor]:
         pass
 
     @abstractmethod
-    def _postprocess(self, outputs: torch.Tensor) -> TaskResult:
+    def _postprocess(self, outputs: Any) -> TaskResult:
         pass
 
     def _inference(self, processed_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:

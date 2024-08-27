@@ -23,6 +23,43 @@ class DataManager:
         self._currentSize = self._calculateInitialSize()
         self.dbName = dbName
         logger.info(f"Connection to db established")
+        self._restoreConsistency()
+
+    def _restoreConsistency(self):
+        pipeline = [
+        {
+            "$lookup": {
+                "from": "metadata",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "match"
+            }
+        },
+        {
+            "$unwind": {
+                "path": "$match",
+                "preserveNullAndEmptyArrays": True
+            }
+        },
+        {
+            "$match": {
+                "match": None
+            }
+        },
+        {
+            "$project": {
+                "_id": 1
+            }
+        }
+        ]
+
+        missingKeys = self._db.fs.files.aggregate(pipeline)
+        for res in missingKeys:
+            self._deleteFile(res["_id"])
+        
+        logger.info(f"Database consistency restored.")
+
+        # TODO: is the other way around needed?
 
 
     def _calculateInitialSize(self) -> int:
@@ -43,40 +80,51 @@ class DataManager:
         # TODO: this should be related to the type of task. Assuming Detection for now
         return label["output"].classes
 
+    def _checkConsistency(self):
+        fsFilesN = self._db.fs.files.count_documents({})
+        metadataN = self._db.metadata.count_documents({})
+
+        if fsFilesN != metadataN:
+            error_message = f"Filesystem - metadata mismatch: fs.files count = {fsFilesN}, metadata count = {metadataN}"
+            logger.error(error_message)
+            raise RuntimeError(error_message)
+
     def addImage(self, imageData: np.ndarray):
-        # Convert np.ndarray to bytes
-        imagePil = Image.fromarray(imageData)
-        with io.BytesIO() as output:
-            imagePil.save(output, format="JPEG")
-            imageBytes = output.getvalue()
+            with self._dbClient.start_session() as session:
+                with session.start_transaction():
+                    # Convert np.ndarray to bytes
+                    imagePil = Image.fromarray(imageData)
+                    with io.BytesIO() as output:
+                        imagePil.save(output, format="JPEG")
+                        imageBytes = output.getvalue()
 
-        imageName = f"img_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.jpg"
-        imageSize = len(imageBytes)
+                    imageName = f"img_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.jpg"
+                    imageSize = len(imageBytes)
 
-        # Ensure the dataset size does not exceed the maximum size
-        while self._currentSize + imageSize > self._maxSize:
-            victimId = self._selectVictim()
-            if victimId:
-                self.removeImage(victimId)
-            else:
-                raise RuntimeError("No image to remove but the dataset is over capacity.")
+                    # Ensure the dataset size does not exceed the maximum size
+                    while self._currentSize + imageSize > self._maxSize:
+                        victimId = self._selectVictim()
+                        if victimId:
+                            self.removeImage(victimId)
+                        else:
+                            raise RuntimeError("No image to remove but the dataset is over capacity.")
 
+                    self._currentSize += imageSize
 
-        self._currentSize += imageSize
+                    imageId = self._fs.put(imageBytes, filename=imageName)
 
-        # Store image using GridFS
-        imageId = self._fs.put(imageBytes, filename=imageName)
+                    annotation = self._annotateImage(imageData)
 
-        annotation = self._annotateImage(imageData)
-        
-        # Store metadata and annotation
-        metadata = {
-            '_id': imageId,
-            'filename': imageName,
-            'upload_date': datetime.now(),
-            'annotation': annotation
-        }
-        self._db.metadata.insert_one(metadata)
+                    # Store metadata and annotation
+                    metadata = {
+                        '_id': imageId,
+                        'filename': imageName,
+                        'upload_date': datetime.now(),
+                        'annotation': annotation
+                    }
+                    self._db.metadata.insert_one(metadata)
+
+                    self._checkConsistency()
 
     def getImage(self, imageId):
         imageData = self._fs.get(ObjectId(imageId)).read()
@@ -95,11 +143,21 @@ class DataManager:
         # TODO
         pass
 
+    def _deleteFile(self, id: str):
+        self._fs.delete(ObjectId(id))
+
+    def _deleteMetadata(self, id: str):
+        self._db.metadata.delete_one({'_id': ObjectId(id)})
+
     def removeImage(self, image_id):
-        imageLength = self._db.fs.files.find_one({'_id': ObjectId(image_id)})['length']
-        self._fs.delete(ObjectId(image_id))
-        self._db.metadata.delete_one({'_id': ObjectId(image_id)})
-        self._currentSize -= imageLength 
+        with self._dbClient.start_session() as session:
+            with session.start_transaction():
+                imageLength = self._db.fs.files.find_one({'_id': ObjectId(image_id)})['length']
+                
+                self._deleteFile(image_id)
+                self._deleteMetadata(image_id)
+                
+                self._currentSize -= imageLength
 
     def __del__(self):
         self._dbClient.close()

@@ -26,10 +26,10 @@ src/feda/concreteConnector/deployer/__init__.py
 src/feda/concreteModel/__init__.py
 src/feda/concreteModel/teacherPool.py
 src/feda/concreteModel/student/__init__.py
-src/feda/concreteModel/student/yolov8.py
+src/feda/concreteModel/student/yolo.py
 src/feda/concreteModel/teacher/__init__.py
 src/feda/concreteModel/teacher/florence2.py
-src/feda/concreteModel/teacher/yolov8.py
+src/feda/concreteModel/teacher/yolo.py
 src/feda/distillation/distillationTrainer.py
 src/feda/managers/__init__.py
 src/feda/managers/dataManager.py
