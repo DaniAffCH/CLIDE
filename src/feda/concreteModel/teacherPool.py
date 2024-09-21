@@ -1,6 +1,6 @@
 import random
 from feda.abstractModel.teacherModel import TeacherModel
-from typing import Sequence, Optional
+from typing import Sequence, Optional, Tuple
 
 # Following singleton design pattern. There should be a unique TeacherPool
 class TeacherPool:
@@ -22,3 +22,10 @@ class TeacherPool:
     
     def getRandomModel(self) -> TeacherModel:
         return random.choice(list(self._pool.values()))
+    
+    def teacherReviewerSplit(self) -> Tuple[TeacherModel,TeacherModel]:
+        if len(self._pool) < 2:
+            raise ValueError("There must be at least two models in the pool to split.")
+
+        teacher, reviewer = random.sample(list(self._pool.values()), 2)
+        return teacher, reviewer

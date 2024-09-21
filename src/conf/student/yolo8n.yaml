@@ -1,0 +1,2 @@
+_target_: feda.concreteModel.student.yolo.Yolo
+modelType: YOLOV8N

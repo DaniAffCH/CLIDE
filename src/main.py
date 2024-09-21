@@ -25,10 +25,15 @@ def main(cfg: DictConfig):
     teachers = [hydra.utils.instantiate(teacher) for teacher in cfg.teachers.values()]
     teacherPool = TeacherPool(teachers)
 
+    student = hydra.utils.instantiate(cfg.student)
+
     dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool)
     
     collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
-    
+
+    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
+    trainer.train()
+
     collector.connect()
     collector.poll()
 

@@ -3,5 +3,7 @@ log_level: INFO
 defaults:
   - _self_
   - teachers: default
+  - student: yolo8n
   - datamanager: mongolocal
   - collector: rtsp
+  - trainer: ultralytics

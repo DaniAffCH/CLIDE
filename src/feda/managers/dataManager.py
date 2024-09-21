@@ -4,6 +4,7 @@ from typing import Dict
 import gridfs
 from bson.objectid import ObjectId
 from datetime import datetime
+from typing import List
 import humanfriendly
 import io
 from PIL import Image
@@ -135,9 +136,15 @@ class DataManager:
         else:
             raise KeyError(f"No such image: {imageId}")
         
-    def getDataset(self):
-        # TODO
-        pass
+    def getAllIds(self) -> List[str]:
+        '''
+        Returns a List of image ids.
+        '''
+        dataset = []
+        cursor = self._db.metadata.find({}, {'_id': 1})
+        for doc in cursor:
+            dataset.append(str(doc['_id']))
+        return dataset
 
     def clean(self):
         # TODO
