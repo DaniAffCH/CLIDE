@@ -3,7 +3,9 @@ from feda.abstractModel.studentModel import StudentModel
 from feda.concreteModel.teacherPool import TeacherPool
 from feda.managers.dataManager import DataManager
 from feda.adapters.dataset import StubDataset
+from feda.validator.distillationValidator import UltralyticsValidator
 from ultralytics.utils import LOGGER, colorstr, RANK, TQDM
+from copy import copy
 import numpy as np
 import torch
 import time
@@ -12,7 +14,9 @@ import gc
 from torch import distributed as dist
 import math
 from overrides import override
+from ultralytics.models import yolo
 from ultralytics.utils import DEFAULT_CFG
+
 
 class UltralyticsTrainer(DetectionTrainer):
 
@@ -21,12 +25,21 @@ class UltralyticsTrainer(DetectionTrainer):
         self.dataManager = dataManager
         self.teacherPool = teacherPool
         self.studentModel = studentModel
+        self.studentModel.model.requires_grad_(True)
 
         self.teacherModel, self.reviewerModel = self.teacherPool.teacherReviewerSplit()
 
     @override
     def get_dataset(self):
         return "", ""
+    
+    @override
+    def get_validator(self):
+        """Returns a DetectionValidator for YOLO model validation."""
+        self.loss_names = "box_loss", "cls_loss", "dfl_loss"
+        return UltralyticsValidator(
+            self.reviewerModel, self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
+        )
 
     @override
     def build_dataset(self, img_path, mode="train", batch=None):
