@@ -29,13 +29,13 @@ def main(cfg: DictConfig):
 
     dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool)
     
-    collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
+    #collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
 
-    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
+    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager, overrides={"workers":0})
     trainer.train()
 
-    collector.connect()
-    collector.poll()
+    #collector.connect()
+    #collector.poll()
 
 
 if __name__ == "__main__":

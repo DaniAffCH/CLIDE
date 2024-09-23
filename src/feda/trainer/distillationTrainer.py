@@ -1,10 +1,11 @@
-from ultralytics.models.yolo.detect import DetectionTrainer
 from feda.abstractModel.studentModel import StudentModel
 from feda.concreteModel.teacherPool import TeacherPool
 from feda.managers.dataManager import DataManager
 from feda.adapters.dataset import StubDataset
 from feda.validator.distillationValidator import UltralyticsValidator
-from ultralytics.utils import LOGGER, colorstr, RANK, TQDM
+from ultralytics.utils import LOGGER, colorstr, RANK, TQDM, DEFAULT_CFG
+from ultralytics.models.yolo.detect import DetectionTrainer
+from ultralytics.utils.torch_utils import autocast
 from copy import copy
 import numpy as np
 import torch
@@ -14,9 +15,7 @@ import gc
 from torch import distributed as dist
 import math
 from overrides import override
-from ultralytics.models import yolo
-from ultralytics.utils import DEFAULT_CFG
-
+from ultralytics.utils import IterableSimpleNamespace
 
 class UltralyticsTrainer(DetectionTrainer):
 
@@ -27,6 +26,7 @@ class UltralyticsTrainer(DetectionTrainer):
         self.studentModel = studentModel
         self.studentModel.model.requires_grad_(True)
 
+        self.args.plots = False
         self.teacherModel, self.reviewerModel = self.teacherPool.teacherReviewerSplit()
 
     @override
@@ -47,15 +47,22 @@ class UltralyticsTrainer(DetectionTrainer):
     
     @override
     def get_model(self, cfg=None, weights=None, verbose=True):
-        return self.studentModel.model
+        return self.studentModel.model.model
     
     @override
     def set_model_attributes(self):
-        pass
-    
+
+        # TODO: take from a cfg
+        self.model.args["box"] = 7.5
+        self.model.args["cls"] = 0.5
+        self.model.args["dfl"] = 1.5
+
+        self.model.args = IterableSimpleNamespace(**self.model.args)
+        
+
     @torch.no_grad()
-    def _getTeacherPrediction(self, images):
-        gt = self.teacherModel(images)
+    def _getTeacherPrediction(self, images):        
+        gt = self.teacherModel.model(images)
 
         all_bboxes = []
         all_batch_idx = []
@@ -111,8 +118,7 @@ class UltralyticsTrainer(DetectionTrainer):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")  # suppress 'Detected lr_scheduler.step() before optimizer.step()'
                 self.scheduler.step()
-
-            self.model.train()
+            self.model.train() 
             if RANK != -1:
                 self.train_loader.sampler.set_epoch(epoch)
             pbar = enumerate(self.train_loader)

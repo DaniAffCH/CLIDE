@@ -2,7 +2,10 @@ from torch.utils.data import Dataset
 import io
 from PIL import Image
 from feda.managers.dataManager import DataManager
-from torchvision import transforms
+import torch
+from ultralytics.data.augment import LetterBox
+import numpy as np
+
 
 class StubDataset(Dataset):
     def __init__(self, dataManager: DataManager):
@@ -11,6 +14,7 @@ class StubDataset(Dataset):
         '''
         self.dataManager = dataManager
         self.dataset = self.dataManager.getAllIds()  # Fetch dataset IDs
+        self.lb = LetterBox() # TODO: pass parameters!
 
     def __len__(self):
         '''
@@ -26,6 +30,11 @@ class StubDataset(Dataset):
         image_data, annotation = self.dataManager.getImage(image_id)
         
         image = Image.open(io.BytesIO(image_data)).convert('RGB')
-        image_tensor = transforms.ToTensor()(image)  
-        
-        return image_tensor, annotation
+
+        adjusted_image = self.lb(image=np.array(image))
+        image_tensor = torch.tensor(adjusted_image, dtype=torch.uint8).permute(2, 0, 1)
+        # TODO: return some kind of annotation?
+
+        return {
+            "img":image_tensor
+        }
