@@ -36,5 +36,8 @@ class StubDataset(Dataset):
         # TODO: return some kind of annotation?
 
         return {
-            "img":image_tensor
+            "img":image_tensor,
+            "ori_shape":torch.tensor([640,640]),
+            "ratio_pad":torch.tensor([[1,1],[0,0]]),
+            "img_id":image_id
         }

@@ -27,6 +27,7 @@ class Yolo(TeacherModel):
         name = modelType.split(".")[0]
 
         model = YOLO(modelType, "detect")
+        model.model.args["verbose"] = False
 
         super().__init__(model, name, isVLM)
 

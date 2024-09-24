@@ -2,6 +2,7 @@ from feda.abstractModel.studentModel import StudentModel
 from feda.concreteModel.teacherPool import TeacherPool
 from feda.managers.dataManager import DataManager
 from feda.adapters.dataset import StubDataset
+from feda.adapters.ultralytics import batchedTeacherPredictions
 from feda.validator.distillationValidator import UltralyticsValidator
 from ultralytics.utils import LOGGER, colorstr, RANK, TQDM, DEFAULT_CFG
 from ultralytics.models.yolo.detect import DetectionTrainer
@@ -59,33 +60,6 @@ class UltralyticsTrainer(DetectionTrainer):
 
         self.model.args = IterableSimpleNamespace(**self.model.args)
         
-
-    @torch.no_grad()
-    def _getTeacherPrediction(self, images):        
-        gt = self.teacherModel.model(images)
-
-        all_bboxes = []
-        all_batch_idx = []
-        all_cls = []
-
-        for i, el in enumerate(gt):
-            bbox = el.boxes.xywhn.clone().detach()
-            batch_idx = torch.full((bbox.shape[0],), i, device=bbox.device)
-            cls = el.boxes.cls.clone().detach()
-
-            all_bboxes.append(bbox)
-            all_batch_idx.append(batch_idx)
-            all_cls.append(cls)
-
-        concatenated_bboxes = torch.cat(all_bboxes, dim=0)
-        concatenated_batch_idx = torch.cat(all_batch_idx, dim=0)
-        concatenated_cls = torch.cat(all_cls, dim=0)
-
-        return {
-            "batch_idx": concatenated_batch_idx,
-            "cls": concatenated_cls,
-            "bboxes": concatenated_bboxes
-        }
 
     def _do_train(self, world_size=1):
         
@@ -151,7 +125,7 @@ class UltralyticsTrainer(DetectionTrainer):
                 
                     batch = self.preprocess_batch(batch)
 
-                    teacher_pred = self._getTeacherPrediction(batch["img"])
+                    teacher_pred = batchedTeacherPredictions(self.teacherModel ,batch["img"])
 
                     batch["batch_idx"] = teacher_pred["batch_idx"]
                     batch["cls"] = teacher_pred["cls"]
