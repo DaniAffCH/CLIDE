@@ -5,5 +5,5 @@ defaults:
   - teachers: default
   - student: yolo8n
   - datamanager: mongolocal
-  - collector: rtsp
+  - collector: local
   - trainer: ultralytics

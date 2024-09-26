@@ -16,7 +16,9 @@ def main(cfg: DictConfig):
 
     print(OmegaConf.to_yaml(cfg))
 
-    logging.basicConfig(level=getattr(logging, LogLevel[cfg.log_level].value), format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=getattr(logging, LogLevel[cfg.log_level].value), 
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        datefmt='%d-%m-%Y %H:%M:%S')
 
     logger = logging.getLogger(__name__)
 
@@ -29,14 +31,15 @@ def main(cfg: DictConfig):
 
     dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool)
     
-    #collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
+    collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
+    
+    collector.connect()
 
-    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager, overrides={"workers":0})
-    trainer.train()
-
-    #collector.connect()
-    #collector.poll()
-
+    # trainer must be recreated each time?
+    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager, overrides={"workers":0, "patience":10})
+    while True:
+        collector.poll()
+        trainer.train()
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 from feda.abstractModel.studentModel import StudentModel
 from feda.concreteModel.teacherPool import TeacherPool
 from feda.managers.dataManager import DataManager
-from feda.adapters.dataset import StubDataset
+from feda.adapters.dataset import StubDatasetFactory
 from feda.adapters.ultralytics import batchedTeacherPredictions
 from feda.validator.distillationValidator import UltralyticsValidator
 from ultralytics.utils import LOGGER, colorstr, RANK, TQDM, DEFAULT_CFG
@@ -17,18 +17,32 @@ from torch import distributed as dist
 import math
 from overrides import override
 from ultralytics.utils import IterableSimpleNamespace
+from typing import Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UltralyticsTrainer(DetectionTrainer):
 
-    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, dataManager: DataManager, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, dataManager: DataManager, splitRatio: Dict[str, float], cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         super().__init__(cfg, overrides, _callbacks)
         self.dataManager = dataManager
         self.teacherPool = teacherPool
         self.studentModel = studentModel
+        self.datasetFactory = StubDatasetFactory(self.dataManager, splitRatio)
         self.studentModel.model.requires_grad_(True)
 
         self.args.plots = False
+        self.teacherModel = None
+        self.reviewerModel = None
+        
+    def updateTeacherReviewer(self):
         self.teacherModel, self.reviewerModel = self.teacherPool.teacherReviewerSplit()
+        logger.info(f"Teacher Model: {self.teacherModel.name}")
+        logger.info(f"Reviewer Model: {self.reviewerModel.name}")
+
+    def updateDataset(self):
+        self.datasetFactory.updateData()
 
     @override
     def get_dataset(self):
@@ -43,8 +57,8 @@ class UltralyticsTrainer(DetectionTrainer):
         )
 
     @override
-    def build_dataset(self, img_path, mode="train", batch=None):
-        return StubDataset(self.dataManager)
+    def build_dataset(self, img_path, mode="train", batch=None):            
+        return self.datasetFactory(mode)
     
     @override
     def get_model(self, cfg=None, weights=None, verbose=True):
@@ -52,18 +66,14 @@ class UltralyticsTrainer(DetectionTrainer):
     
     @override
     def set_model_attributes(self):
-
-        # TODO: take from a cfg
-        self.model.args["box"] = 7.5
-        self.model.args["cls"] = 0.5
-        self.model.args["dfl"] = 1.5
-
-        self.model.args = IterableSimpleNamespace(**self.model.args)
-        
+        self.model.args = self.args        
 
     def _do_train(self, world_size=1):
         
         """Train completed, evaluate and plot if specified by arguments."""
+        self.updateDataset()
+        self.updateTeacherReviewer()
+
         if world_size > 1:
             self._setup_ddp(world_size)
         self._setup_train(world_size)

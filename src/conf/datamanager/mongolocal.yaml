@@ -2,4 +2,6 @@ _target_: feda.managers.dataManager.DataManager
 
 dbUri: mongodb://localhost:27017
 dbName: testing_db
-maxSize: 10 MB
+maxSize: 5 MB
+updateRate: 2
+cleanFirst: True

@@ -11,18 +11,24 @@ from PIL import Image
 import numpy as np
 import logging
 import torch
+import time
 
 logger = logging.getLogger(__name__)
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str) -> None:
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, cleanFirst: bool = False) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
+        self.dbName = dbName
         self._teacherPool = teacherPool
         self._maxSize = humanfriendly.parse_size(maxSize)
         self._dbClient = MongoClient(dbUri)
+        if cleanFirst:
+            self.clean()
         self._db = self._dbClient[dbName]
         self._fs = gridfs.GridFS(self._db)
         self._currentSize = self._calculateInitialSize()
-        self.dbName = dbName
+        self._timer = time.time()
+        self._updateTimer = time.time()
+        self._updateRate = updateRate # in seconds 
         logger.info(f"Connection to db established")
         self._restoreConsistency()
 
@@ -55,10 +61,14 @@ class DataManager:
         ]
 
         missingKeys = self._db.fs.files.aggregate(pipeline)
+        
+        changed = False
         for res in missingKeys:
             self._deleteFile(res["_id"])
+            changed = True
         
-        logger.info(f"Database consistency restored.")
+        if changed:
+            logger.info(f"Database consistency restored.")
 
         # TODO: is the other way around needed?
 
@@ -70,9 +80,15 @@ class DataManager:
         return total_size
 
     def _selectVictim(self):
-        # TODO: find the correct way of selecting a victim. Currently FIFO.
-        oldest = self._db.metadata.find_one(sort=[("upload_date", 1)])
-        return oldest['_id'] if oldest else None
+        # TODO: find the correct way of selecting a victim. Currently RANDOM.
+
+        #FIFO
+        #oldest = self._db.metadata.find_one(sort=[("upload_date", 1)])
+        #return oldest['_id'] if oldest else None
+
+        #RANDOM
+        random_doc = list(self._db.metadata.aggregate([{"$sample": {"size": 1}}]))
+        return random_doc[0]['_id'] if random_doc else None
 
     def _annotateImage(self, imageData: np.ndarray) -> Dict[str, torch.Tensor]:
         annotator = self._teacherPool.getRandomModel()
@@ -91,6 +107,9 @@ class DataManager:
             raise RuntimeError(error_message)
 
     def addImage(self, imageData: np.ndarray):
+            # limit the update frequency
+            if time.time() - self._updateTimer < self._updateRate:
+                return
             with self._dbClient.start_session() as session:
                 with session.start_transaction():
                     # Convert np.ndarray to bytes
@@ -109,6 +128,8 @@ class DataManager:
                             self.removeImage(victimId)
                         else:
                             raise RuntimeError("No image to remove but the dataset is over capacity.")
+
+                    self._updateTimer = time.time()
 
                     self._currentSize += imageSize
 
@@ -146,9 +167,13 @@ class DataManager:
             dataset.append(str(doc['_id']))
         return dataset
 
+    def stopWriting(self) -> bool:
+        # TODO: fix this
+        return time.time() - self._timer > 60
+
     def clean(self):
-        # TODO
-        pass
+        logger.info(f"Cleaning database {self.dbName}")
+        self._dbClient.drop_database(self.dbName)
 
     def _deleteFile(self, id: str):
         self._fs.delete(ObjectId(id))

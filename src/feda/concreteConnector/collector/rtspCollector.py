@@ -85,8 +85,8 @@ class RTSPCollector(RemoteCollector):
         self.rs = running_s
         return sync
 
+    @override
     def _pollData(self) -> Generator[np.ndarray, None, None]:
-
         try:
             for frame in self._container.decode(video=0):
 
@@ -101,17 +101,6 @@ class RTSPCollector(RemoteCollector):
             logger.warning("Received invalid av data.")
             yield np.empty(0)
 
-    def _writeData(self, image: np.ndarray):
-        self._dataManager.addImage(image)
-
-    @override
-    def poll(self) -> None:
-        logger.info(f"Starting image streaming.")
-        if not self._isConnected:
-            logger.critical("Attempted to poll data without a device connection.")
-            raise AssertionError("Device is not connected.")
-        for image in self._pollData():
-            self._writeData(image)
 
     @override
     def isAlive(self) -> bool:

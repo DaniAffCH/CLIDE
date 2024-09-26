@@ -1,2 +1,4 @@
 _target_: feda.trainer.distillationTrainer.UltralyticsTrainer
-
+splitRatio: 
+    train: 0.75
+    val: 0.25

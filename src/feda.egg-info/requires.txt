@@ -13,3 +13,4 @@ ultralytics
 cython
 omegaconf
 hydra-core
+torchvision
