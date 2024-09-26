@@ -2,3 +2,7 @@ _target_: feda.trainer.distillationTrainer.UltralyticsTrainer
 splitRatio: 
     train: 0.75
     val: 0.25
+
+overrides:
+    patience: 10
+    epochs: 1

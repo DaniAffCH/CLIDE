@@ -21,13 +21,15 @@ class RemoteCollector(RemoteConnector, ABC):
         self._dataManager.addImage(image)
 
     def _stopPolling(self) -> bool:
-        return self._dataManager.stopWriting()
+        return self._dataManager.stopCollecting()
 
     def poll(self) -> None:
         logger.info(f"Starting image streaming.")
         if not self._isConnected:
             logger.critical("Attempted to poll data without a device connection.")
             raise AssertionError("Device is not connected.")
+        
+        self._dataManager.startCollectionSession()
         for image in self._pollData():
             if self._stopPolling():
                 return

@@ -19,7 +19,7 @@ def main(cfg: DictConfig):
     logging.basicConfig(level=getattr(logging, LogLevel[cfg.log_level].value), 
                         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         datefmt='%d-%m-%Y %H:%M:%S')
-
+    
     logger = logging.getLogger(__name__)
 
     logger.info("Starting the application")
@@ -36,7 +36,7 @@ def main(cfg: DictConfig):
     collector.connect()
 
     # trainer must be recreated each time?
-    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager, overrides={"workers":0, "patience":10})
+    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
     while True:
         collector.poll()
         trainer.train()

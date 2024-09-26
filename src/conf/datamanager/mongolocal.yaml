@@ -4,4 +4,6 @@ dbUri: mongodb://localhost:27017
 dbName: testing_db
 maxSize: 5 MB
 updateRate: 2
-cleanFirst: True
+unusedRatioThreshold: 0.5
+minCollectingTime: 30
+cleanFirst: False

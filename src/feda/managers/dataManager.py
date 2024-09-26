@@ -15,7 +15,7 @@ import time
 
 logger = logging.getLogger(__name__)
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, cleanFirst: bool = False) -> None:
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, cleanFirst: bool = False) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
         self.dbName = dbName
         self._teacherPool = teacherPool
@@ -26,11 +26,18 @@ class DataManager:
         self._db = self._dbClient[dbName]
         self._fs = gridfs.GridFS(self._db)
         self._currentSize = self._calculateInitialSize()
-        self._timer = time.time()
+        self._collectionTimer = time.time()
         self._updateTimer = time.time()
         self._updateRate = updateRate # in seconds 
+        self._unusedRatioThreshold = unusedRatioThreshold
+        assert 0. <= unusedRatioThreshold <= 1., "unusedRatioThreshold must be between 0 and 1 (included)"
+        self._minCollectingTime = minCollectingTime
+
         logger.info(f"Connection to db established")
         self._restoreConsistency()
+
+    def startCollectionSession(self):
+        self._collectionTimer = time.time()
 
     def _restoreConsistency(self):
         pipeline = [
@@ -61,7 +68,7 @@ class DataManager:
         ]
 
         missingKeys = self._db.fs.files.aggregate(pipeline)
-        
+
         changed = False
         for res in missingKeys:
             self._deleteFile(res["_id"])
@@ -82,11 +89,6 @@ class DataManager:
     def _selectVictim(self):
         # TODO: find the correct way of selecting a victim. Currently RANDOM.
 
-        #FIFO
-        #oldest = self._db.metadata.find_one(sort=[("upload_date", 1)])
-        #return oldest['_id'] if oldest else None
-
-        #RANDOM
         random_doc = list(self._db.metadata.aggregate([{"$sample": {"size": 1}}]))
         return random_doc[0]['_id'] if random_doc else None
 
@@ -96,6 +98,20 @@ class DataManager:
 
         # TODO: this should be related to the type of task. Assuming Detection for now
         return label["output"].classes
+
+    def _unusedRatio(self) -> float:
+        '''
+        Returns the ratio of images where "used" is False.
+        '''
+        total_images = self._db.metadata.count_documents({})
+        unused_images = self._db.metadata.count_documents({"used": False})
+
+        logger.info(f"{total_images=}   {unused_images=}")
+
+        if total_images == 0:
+            return 0.0  
+
+        return unused_images / total_images
 
     def _checkConsistency(self):
         fsFilesN = self._db.fs.files.count_documents({})
@@ -142,7 +158,8 @@ class DataManager:
                         '_id': imageId,
                         'filename': imageName,
                         'upload_date': datetime.now(),
-                        'annotation': annotation
+                        'annotation': annotation,
+                        'used': False
                     }
                     self._db.metadata.insert_one(metadata)
 
@@ -165,11 +182,17 @@ class DataManager:
         cursor = self._db.metadata.find({}, {'_id': 1})
         for doc in cursor:
             dataset.append(str(doc['_id']))
+
+        # Update all images' "used" field to True
+        self._db.metadata.update_many({}, {"$set": {"used": True}})
+
         return dataset
 
-    def stopWriting(self) -> bool:
-        # TODO: fix this
-        return time.time() - self._timer > 60
+    def stopCollecting(self) -> bool:
+        minTimeElapsed = time.time() - self._collectionTimer > self._minCollectingTime
+        unused = self._unusedRatio()
+        logger.info(f"Current unused ratio {unused}")
+        return unused > self._unusedRatioThreshold and minTimeElapsed
 
     def clean(self):
         logger.info(f"Cleaning database {self.dbName}")

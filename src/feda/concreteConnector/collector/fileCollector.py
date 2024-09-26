@@ -41,7 +41,6 @@ class FileCollector(RemoteCollector):
         
     @override
     def _pollData(self) -> Generator[np.ndarray, None, None]:
-        self._dataManager._timer = time.time() # TODO: hack for now :)
         for imgPath in self._pathIter:
             if self._isImage(imgPath):
                 img = np.array(Image.open(imgPath))
