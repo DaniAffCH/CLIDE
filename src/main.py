@@ -37,9 +37,23 @@ def main(cfg: DictConfig):
 
     # trainer must be recreated each time?
     trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
+    quantizer = hydra.utils.instantiate(cfg.quantizer, dataset = trainer.build_dataset(None, mode="val"))
+    bestMetric = 0
     while True:
+        qStudent = quantizer.quantize(student)
+        exit(0)
         collector.poll()
         trainer.train()
+
+        if trainer.getResultMetric() > bestMetric:
+            bestMetric = trainer.getResultMetric()
+
+            # quantize
+            qStudent = quantizer.quantize(student)
+            exit(0)
+
+            # deploy
+
 
 if __name__ == "__main__":
     main()

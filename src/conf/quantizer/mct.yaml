@@ -1,0 +1,2 @@
+_target_: feda.quantizer.mctQuantizer.MCTQuantizer
+batchSize: 16

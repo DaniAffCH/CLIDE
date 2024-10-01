@@ -14,3 +14,4 @@ cython
 omegaconf
 hydra-core
 torchvision
+model-compression-toolkit>=2.2.0

@@ -8,7 +8,7 @@ authors = [
     {name = "Daniele Affinita", email = "daniele.affinita@sony.com"}
 ]
 description = "Foundation Edge Distillation Architecture"
-version = "0.0.1"
+version = "0.1.0"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
@@ -27,5 +27,8 @@ dependencies = [
     "cython",
     "omegaconf",
     "hydra-core",
-    "torchvision"
+    "torchvision",
+    "paramiko",
+    "scp",
+    "model-compression-toolkit>=2.2.0"
 ]

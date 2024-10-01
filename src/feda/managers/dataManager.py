@@ -106,8 +106,6 @@ class DataManager:
         total_images = self._db.metadata.count_documents({})
         unused_images = self._db.metadata.count_documents({"used": False})
 
-        logger.info(f"{total_images=}   {unused_images=}")
-
         if total_images == 0:
             return 0.0  
 
@@ -191,7 +189,6 @@ class DataManager:
     def stopCollecting(self) -> bool:
         minTimeElapsed = time.time() - self._collectionTimer > self._minCollectingTime
         unused = self._unusedRatio()
-        logger.info(f"Current unused ratio {unused}")
         return unused > self._unusedRatioThreshold and minTimeElapsed
 
     def clean(self):

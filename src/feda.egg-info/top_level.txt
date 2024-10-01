@@ -1,3 +1,5 @@
+conf
 feda
 main
-test
+outputs
+runs

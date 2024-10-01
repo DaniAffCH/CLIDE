@@ -16,7 +16,6 @@ import gc
 from torch import distributed as dist
 import math
 from overrides import override
-from ultralytics.utils import IterableSimpleNamespace
 from typing import Dict
 import logging
 
@@ -236,3 +235,6 @@ class UltralyticsTrainer(DetectionTrainer):
         gc.collect()
         torch.cuda.empty_cache()
         self.run_callbacks("teardown")
+
+    def getResultMetric(self):
+        return self.metrics["metrics/mAP50-95(B)"]
