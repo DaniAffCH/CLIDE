@@ -30,5 +30,6 @@ dependencies = [
     "torchvision",
     "paramiko",
     "scp",
-    "model-compression-toolkit>=2.2.0"
+    "model-compression-toolkit>=2.2.0",
+    "sony_custom_layers"
 ]

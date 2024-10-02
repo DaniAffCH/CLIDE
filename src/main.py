@@ -1,6 +1,7 @@
 from feda.concreteModel.teacherPool import TeacherPool
 from omegaconf import DictConfig, OmegaConf
 from enum import Enum
+import tempfile
 import logging
 import hydra
 
@@ -35,25 +36,25 @@ def main(cfg: DictConfig):
     
     collector.connect()
 
-    # trainer must be recreated each time?
     trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
-    quantizer = hydra.utils.instantiate(cfg.quantizer, dataset = trainer.build_dataset(None, mode="val"))
+    quantizer = hydra.utils.instantiate(cfg.quantizer)
+    deployer = hydra.utils.instantiate(cfg.deployer, studentModel=student)
+    
     bestMetric = 0
+
     while True:
-        qStudent = quantizer.quantize(student)
-        exit(0)
         collector.poll()
         trainer.train()
 
         if trainer.getResultMetric() > bestMetric:
+            logger.info(f"Monitor Metric improved passing from {bestMetric} to {trainer.getResultMetric()}")
             bestMetric = trainer.getResultMetric()
-
-            # quantize
-            qStudent = quantizer.quantize(student)
-            exit(0)
-
-            # deploy
-
+            
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # quantize
+                qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
+                # deploy
+                deployer.deploy(temp_dir, qStudentPath)
 
 if __name__ == "__main__":
     main()

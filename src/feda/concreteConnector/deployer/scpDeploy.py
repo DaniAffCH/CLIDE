@@ -1,4 +1,5 @@
 from feda.abstractConnector.remoteDeployer import RemoteDeployer
+from feda.concreteConnector.deployer.packager.sdsp import SDSPPackager
 from feda.abstractModel.studentModel import StudentModel
 import subprocess
 import paramiko
@@ -9,7 +10,7 @@ from scp import SCPClient
 logger = logging.getLogger(__name__)
 
 class SCPDeploy(RemoteDeployer):
-    def __init__(self, address: str, port: str, serial:str, deviceName: str, user: str, password: str, packager: , studentModel: StudentModel) -> None:
+    def __init__(self, address: str, port: str, serial:str, deviceName: str, user: str, password: str, studentModel: StudentModel) -> None:
         super().__init__(address, deviceName, studentModel)
         self._port = port
         self._serial = serial
@@ -17,6 +18,7 @@ class SCPDeploy(RemoteDeployer):
         self._pass = password
         self._sshClient = None
         self._scpClinet = None
+        self._converter = SDSPPackager(inputPersistency=True)
         
     def _createSSHClient(server, port, user, password) -> paramiko.SSHClient:
         """ Create a SSH client to connect to a device 
@@ -53,8 +55,11 @@ class SCPDeploy(RemoteDeployer):
         return self._isConnected
 
     @override
-    def deploy() -> None:
-        pass
+    def deploy(self, workingPath: str, modelPath: str) -> None:  
+        # Convert model
+        convertedPath = self._converter(workingPath, modelPath)
+        print("OKI")
+        
 
     @override
     def isAlive(self) -> bool:

@@ -1,0 +1,9 @@
+_target_: feda.concreteConnector.deployer.scpDeploy.SCPDeploy
+
+address: daxpytip1dec23.ddns.net
+port: 10000
+serial: 00000000000000000000000000000000 
+deviceName: DaxpyXXSettembre
+user: root
+password: tina
+

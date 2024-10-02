@@ -28,6 +28,7 @@ class DataManager:
         self._currentSize = self._calculateInitialSize()
         self._collectionTimer = time.time()
         self._updateTimer = time.time()
+        self._loggingTimer = time.time()
         self._updateRate = updateRate # in seconds 
         self._unusedRatioThreshold = unusedRatioThreshold
         assert 0. <= unusedRatioThreshold <= 1., "unusedRatioThreshold must be between 0 and 1 (included)"
@@ -108,8 +109,14 @@ class DataManager:
 
         if total_images == 0:
             return 0.0  
+        
+        ratio = unused_images / total_images
 
-        return unused_images / total_images
+        if time.time() - self._loggingTimer > 16:
+            logger.info(f"New samples ratio {ratio:.3f} (threshold {self._unusedRatioThreshold})")
+            self._loggingTimer = time.time()
+
+        return ratio
 
     def _checkConsistency(self):
         fsFilesN = self._db.fs.files.count_documents({})
@@ -189,6 +196,7 @@ class DataManager:
     def stopCollecting(self) -> bool:
         minTimeElapsed = time.time() - self._collectionTimer > self._minCollectingTime
         unused = self._unusedRatio()
+        return True
         return unused > self._unusedRatioThreshold and minTimeElapsed
 
     def clean(self):

@@ -10,6 +10,7 @@ src/conf/config.yaml
 src/conf/collector/local.yaml
 src/conf/collector/rtsp.yaml
 src/conf/datamanager/mongolocal.yaml
+src/conf/quantizer/mct.yaml
 src/conf/student/yolo8n.yaml
 src/conf/teachers/default.yaml
 src/conf/trainer/ultralytics.yaml
@@ -37,6 +38,9 @@ src/feda/concreteConnector/collector/__init__.py
 src/feda/concreteConnector/collector/fileCollector.py
 src/feda/concreteConnector/collector/rtspCollector.py
 src/feda/concreteConnector/deployer/__init__.py
+src/feda/concreteConnector/deployer/scpDeploy.py
+src/feda/concreteConnector/deployer/packager/__init__.py
+src/feda/concreteConnector/deployer/packager/sdsp.py
 src/feda/concreteModel/__init__.py
 src/feda/concreteModel/teacherPool.py
 src/feda/concreteModel/student/__init__.py

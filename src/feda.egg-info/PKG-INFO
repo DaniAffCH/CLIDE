@@ -22,7 +22,10 @@ Requires-Dist: cython
 Requires-Dist: omegaconf
 Requires-Dist: hydra-core
 Requires-Dist: torchvision
+Requires-Dist: paramiko
+Requires-Dist: scp
 Requires-Dist: model-compression-toolkit>=2.2.0
+Requires-Dist: sony_custom_layers
 
 # FEDA
 Foundation Edge Distillation Architecture

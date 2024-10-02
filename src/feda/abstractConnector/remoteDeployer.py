@@ -8,5 +8,5 @@ class RemoteDeployer(RemoteConnector, ABC):
         super().__init__(address, deviceName)
 
     @abstractmethod
-    def deploy() -> None:
+    def deploy(self, workingPath: str, modelPath: str) -> None:
         pass
