@@ -32,6 +32,21 @@ class UltralyticsTrainer(DetectionTrainer):
         self.studentModel.model.requires_grad_(True)
 
         self.args.plots = False
+        self.args.augment = False
+
+        # Disable lighting augmentation
+        self.args.hsv_h = 0.
+        self.args.hsv_s = 0.
+        self.args.hsv_v = 0.
+
+        # Disable augmentations
+        self.args.translate = 0.
+        self.args.scale = 0.
+        self.args.mosaic = 0.
+        self.args.fliplr=0.
+        self.args.erasing=0.
+        self.args.crop_fraction=0.
+
         self.teacherModel = None
         self.reviewerModel = None
         
