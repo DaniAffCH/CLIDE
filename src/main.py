@@ -1,4 +1,4 @@
-from feda.concreteModel.teacherPool import TeacherPool
+from clide.concreteModel.teacherPool import TeacherPool
 from omegaconf import DictConfig, OmegaConf
 from enum import Enum
 import tempfile

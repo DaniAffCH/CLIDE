@@ -1,2 +1,2 @@
-_target_: feda.quantizer.mctQuantizer.MCTQuantizer
+_target_: clide.quantizer.mctQuantizer.MCTQuantizer
 batchSize: 16

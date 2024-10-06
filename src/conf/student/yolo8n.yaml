@@ -1,2 +1,2 @@
-_target_: feda.concreteModel.student.yolo.Yolo
+_target_: clide.concreteModel.student.yolo.Yolo
 modelType: YOLOV8N

@@ -1,5 +1,0 @@
-conf
-feda
-main
-outputs
-runs

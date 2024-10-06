@@ -1,4 +1,4 @@
-_target_: feda.concreteConnector.collector.rtspCollector.RTSPCollector
+_target_: clide.concreteConnector.collector.rtspCollector.RTSPCollector
 
 address: "daxpytip1dec23.ddns.net"
 deviceName: "DaxpyXXSettembre"

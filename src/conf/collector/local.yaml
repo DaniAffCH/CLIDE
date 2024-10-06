@@ -1,4 +1,4 @@
-_target_: feda.concreteConnector.collector.fileCollector.FileCollector
+_target_: clide.concreteConnector.collector.fileCollector.FileCollector
 
 address: "localhost"
 deviceName: "LocalDummy"

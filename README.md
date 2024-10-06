@@ -1,4 +1,4 @@
-# FEDA
-Foundation Edge Distillation Architecture
+# CLIDE
+Continual Learning with Importance Distillation for Edge devices framework.
 
-![UML Architecture](assets/FEDA_v3.0.png)
+![UML Architecture](assets/clide_v3.0.png)

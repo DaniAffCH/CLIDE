@@ -1,4 +1,4 @@
-_target_: feda.concreteConnector.deployer.scpDeploy.SCPDeploy
+_target_: clide.concreteConnector.deployer.scpDeploy.SCPDeploy
 
 address: daxpytip1dec23.ddns.net
 port: 10000

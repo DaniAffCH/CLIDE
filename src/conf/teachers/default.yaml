@@ -1,9 +1,9 @@
 #florence2:
-#  _target_: feda.concreteModel.teacher.florence2.Florence2
+#  _target_: clide.concreteModel.teacher.florence2.Florence2
 #  modelType: FLORENCE_2_BASE
 yolo8:
-  _target_: feda.concreteModel.teacher.yolo.Yolo
+  _target_: clide.concreteModel.teacher.yolo.Yolo
   modelType: YOLOV8X
 yolo10:
-  _target_: feda.concreteModel.teacher.yolo.Yolo
+  _target_: clide.concreteModel.teacher.yolo.Yolo
   modelType: YOLOV10X
