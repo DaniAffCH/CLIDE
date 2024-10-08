@@ -71,6 +71,7 @@ class SCPDeploy(RemoteDeployer):
         except subprocess.TimeoutExpired:
             return False
         
+    @override
     def disconnect(self) -> bool:
         if self._scpClient: 
             self._scpClient.close()

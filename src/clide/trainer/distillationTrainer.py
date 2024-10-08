@@ -24,28 +24,29 @@ logger = logging.getLogger(__name__)
 class UltralyticsTrainer(DetectionTrainer):
 
     def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, dataManager: DataManager, splitRatio: Dict[str, float], cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+        cfg.plots = False
+        cfg.augment = False
+
+        # Disable lighting augmentation
+        cfg.hsv_h = 0.
+        cfg.hsv_s = 0.
+        cfg.hsv_v = 0.
+
+        # Disable augmentations
+        cfg.translate = 0.
+        cfg.scale = 0.
+        cfg.mosaic = 0.
+        cfg.fliplr=0.
+        cfg.erasing=0.
+        cfg.crop_fraction=0.
+    
         super().__init__(cfg, overrides, _callbacks)
+        
         self.dataManager = dataManager
         self.teacherPool = teacherPool
         self.studentModel = studentModel
         self.datasetFactory = StubDatasetFactory(self.dataManager, splitRatio)
         self.studentModel.model.requires_grad_(True)
-
-        self.args.plots = False
-        self.args.augment = False
-
-        # Disable lighting augmentation
-        self.args.hsv_h = 0.
-        self.args.hsv_s = 0.
-        self.args.hsv_v = 0.
-
-        # Disable augmentations
-        self.args.translate = 0.
-        self.args.scale = 0.
-        self.args.mosaic = 0.
-        self.args.fliplr=0.
-        self.args.erasing=0.
-        self.args.crop_fraction=0.
 
         self.teacherModel = None
         self.reviewerModel = None

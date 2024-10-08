@@ -50,9 +50,10 @@ def main(cfg: DictConfig):
             bestMetric = trainer.getResultMetric()
             
             with tempfile.TemporaryDirectory() as temp_dir:
-                # quantize
+                # Quantize
                 qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
-                # deploy
+                
+                # Deploy
                 deployer.connect()
                 deployer.deploy(temp_dir, qStudentPath)
                 deployer.disconnect()
