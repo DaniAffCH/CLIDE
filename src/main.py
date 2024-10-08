@@ -33,13 +33,12 @@ def main(cfg: DictConfig):
     dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool)
     
     collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
-    
     collector.connect()
 
     trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
     quantizer = hydra.utils.instantiate(cfg.quantizer)
     deployer = hydra.utils.instantiate(cfg.deployer, studentModel=student)
-    
+
     bestMetric = 0
 
     while True:
@@ -54,7 +53,9 @@ def main(cfg: DictConfig):
                 # quantize
                 qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
                 # deploy
+                deployer.connect()
                 deployer.deploy(temp_dir, qStudentPath)
+                deployer.disconnect()
 
 if __name__ == "__main__":
     main()

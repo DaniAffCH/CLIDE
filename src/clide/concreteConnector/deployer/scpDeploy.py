@@ -10,15 +10,16 @@ from scp import SCPClient
 logger = logging.getLogger(__name__)
 
 class SCPDeploy(RemoteDeployer):
-    def __init__(self, address: str, port: str, serial:str, deviceName: str, user: str, password: str, studentModel: StudentModel) -> None:
+    def __init__(self, packager: SDSPPackager,address: str, port: str, serial:str, deviceName: str, user: str, password: str, remoteModelPath: str, studentModel: StudentModel) -> None:
         super().__init__(address, deviceName, studentModel)
         self._port = port
         self._serial = serial
         self._user = user
         self._pass = password
         self._sshClient = None
-        self._scpClinet = None
-        self._converter = SDSPPackager(inputPersistency=True)
+        self._scpClient = None
+        self._packager = packager
+        self._remoteModelPath = remoteModelPath
         
     def _createSSHClient(server, port, user, password) -> paramiko.SSHClient:
         """ Create a SSH client to connect to a device 
@@ -49,17 +50,16 @@ class SCPDeploy(RemoteDeployer):
 
         logger.info(f"Establishing SCP connection to serial {self._serial} | {self._user}@{self.address}:{self._port}")
         self.sshClient = self._createSSHClient(self._port, self._user, self._pass)
-        self.scpClient = SCPClient(self.sshClient.get_transport())
+        self._scpClient = SCPClient(self.sshClient.get_transport())
         logger.info(f"SCP connection established")
         self._isConnected = True
         return self._isConnected
 
     @override
     def deploy(self, workingPath: str, modelPath: str) -> None:  
-        # Convert model
-        convertedPath = self._converter(workingPath, modelPath)
-        print("OKI")
-        
+        packagedModelPath = self._packager(workingPath, modelPath, self._serial)
+        self._scpClient.put(packagedModelPath, self._remoteModelPath)
+        logger.info(f"New model deployed successfully!")
 
     @override
     def isAlive(self) -> bool:
@@ -72,7 +72,7 @@ class SCPDeploy(RemoteDeployer):
             return False
         
     def disconnect(self) -> bool:
-        if self._sshClient:
+        if self._scpClient: 
             self._scpClient.close()
             self._scpClient = None
         else:

@@ -196,7 +196,6 @@ class DataManager:
     def stopCollecting(self) -> bool:
         minTimeElapsed = time.time() - self._collectionTimer > self._minCollectingTime
         unused = self._unusedRatio()
-        return True
         return unused > self._unusedRatioThreshold and minTimeElapsed
 
     def clean(self):
