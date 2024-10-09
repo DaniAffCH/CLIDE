@@ -1,0 +1,12 @@
+_target_: clide.concreteConnector.deployer.scpDeploy.SCPDeploy
+
+address: 192.168.1.21
+port: 10000
+serial: "100B50501A2102055764011000000000" 
+deviceName: DaxpyServer
+user: root
+password: tina
+remoteModelPath: /mnt/extsd/demo/IMX500_v2/DNNs/
+
+defaults:
+  - packager: sdsp 

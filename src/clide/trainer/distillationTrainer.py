@@ -26,6 +26,7 @@ class UltralyticsTrainer(DetectionTrainer):
     def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, dataManager: DataManager, splitRatio: Dict[str, float], cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         cfg.plots = False
         cfg.augment = False
+        cfg.workers = 0
 
         # Disable lighting augmentation
         cfg.hsv_h = 0.

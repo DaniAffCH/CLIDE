@@ -6,7 +6,7 @@ from transformers.image_utils import ImageInput
 from clide.adapters.tasks import KeyMapping, TaskType, TaskResult, TaskFactory
 from clide.adapters.classes import ClassAdapter
 import torch
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,13 +16,13 @@ class YoloModelType(Enum):
     YOLOV8S = "yolov8s.pt"
 
 class Yolo(StudentModel):
-    def __init__(self, modelType: str) -> None:
+    def __init__(self, modelType: str, hookLayers: Optional[List[str]] = None) -> None:
         modelType = YoloModelType[modelType].value
         name = modelType.split(".")[0]
-
+        
         model = YOLO(modelType, "detect")
 
-        super().__init__(model, name)
+        super().__init__(model, name, hookLayers)
 
     @override
     def _getKeyMapping(self) -> KeyMapping:

@@ -7,7 +7,7 @@ from ultralytics import YOLO
 from overrides import override
 from transformers.image_utils import ImageInput
 import torch
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,18 +18,19 @@ class YoloModelType(Enum):
     YOLOV10M = "yolov10m.pt"
     YOLOV10L = "yolov10l.pt"
     YOLOV10X = "yolov10x.pt"
-
+    YOLOV11M = "yolo11m.pt"
+    YOLOV11L = "yolo11l.pt"
+    YOLOV11X = "yolo11x.pt"
 
 class Yolo(TeacherModel):
-    def __init__(self, modelType: str) -> None:
+    def __init__(self, modelType: str, hookLayers: Optional[List[str]] = None) -> None:
         isVLM = False
         modelType = YoloModelType[modelType].value
         name = modelType.split(".")[0]
 
         model = YOLO(modelType, "detect")
         model.model.args["verbose"] = False
-
-        super().__init__(model, name, isVLM)
+        super().__init__(model, name, isVLM, hookLayers)
 
     @override
     def _getKeyMapping(self) -> KeyMapping:

@@ -1,10 +1,11 @@
 from torch.nn.modules import Module
 from clide.abstractModel.model import Model
 from abc import ABC
+from typing import Optional, List
 
 class TeacherModel(Model, ABC):
-    def __init__(self, model: Module, name: str, isVLM: bool) -> None:
-        super().__init__(model, name)
+    def __init__(self, model: Module, name: str, isVLM: bool, hookLayers: Optional[List[str]] = None) -> None:
+        super().__init__(model, name, hookLayers)
         self._isVLM = isVLM
         self._prompt = ""
 

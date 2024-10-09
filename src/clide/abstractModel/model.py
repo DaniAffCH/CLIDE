@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional    
 import torch
 from torch import nn
 from clide.managers.hookManager import HookManager
@@ -8,13 +8,15 @@ from clide.adapters.tasks import TaskType, KeyMapping, TaskResult
 
 class Model(ABC):
 
-    def __init__(self, model: nn.Module, name: str) -> None:
+    def __init__(self, model: nn.Module, name: str, hookLayers: Optional[List[str]] = None) -> None:
         super().__init__()
         self.name = name
         self._model = model
         # Size expressed in bytes
         self._size = self._computeModelSize()
         self._hookManager = HookManager(model)
+        if hookLayers:
+            self._hookManager.registerHooks(hookLayers)
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._model.to(self._device)
         self._taskType = TaskType.DETECTION # TODO: this should be related to a config

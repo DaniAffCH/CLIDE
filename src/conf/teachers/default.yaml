@@ -4,6 +4,12 @@
 yolo8:
   _target_: clide.concreteModel.teacher.yolo.Yolo
   modelType: YOLOV8X
+  hookLayers: ["model.model.4"]
 yolo10:
   _target_: clide.concreteModel.teacher.yolo.Yolo
   modelType: YOLOV10X
+  hookLayers: ["model.model.4"]
+yolo11:
+  _target_: clide.concreteModel.teacher.yolo.Yolo
+  modelType: YOLOV11X
+  hookLayers: ["model.model.4"]

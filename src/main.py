@@ -52,7 +52,7 @@ def main(cfg: DictConfig):
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Quantize
                 qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
-                
+
                 # Deploy
                 deployer.connect()
                 deployer.deploy(temp_dir, qStudentPath)

@@ -8,4 +8,4 @@ defaults:
   - collector: local
   - trainer: ultralytics
   - quantizer: mct
-  - deployer: scp
+  - deployer: scp_server
