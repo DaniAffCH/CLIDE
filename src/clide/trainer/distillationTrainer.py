@@ -249,6 +249,7 @@ class UltralyticsTrainer(DetectionTrainer):
             if self.args.plots:
                 self.plot_metrics()
             self.run_callbacks("on_train_end")
+        self.model.eval()
         gc.collect()
         torch.cuda.empty_cache()
         self.run_callbacks("teardown")

@@ -1,0 +1,4 @@
+_target_: clide.concreteConnector.deployer.dummyDeploy.DummyDeploy
+
+address: 0.0.0.0 
+deviceName: DummyDevice

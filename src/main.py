@@ -4,6 +4,8 @@ from enum import Enum
 import tempfile
 import logging
 import hydra
+import torch
+import os
 
 class LogLevel(Enum):
     DEBUG = "DEBUG"
@@ -43,20 +45,29 @@ def main(cfg: DictConfig):
 
     while True:
         collector.poll()
+
+        trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
         trainer.train()
 
-        if trainer.getResultMetric() > bestMetric:
-            logger.info(f"Monitor Metric improved passing from {bestMetric} to {trainer.getResultMetric()}")
-            bestMetric = trainer.getResultMetric()
-            
-            with tempfile.TemporaryDirectory() as temp_dir:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            if trainer.getResultMetric() > bestMetric:
+                logger.info(f"Monitor Metric improved passing from {bestMetric} to {trainer.getResultMetric()}")
+                bestMetric = trainer.getResultMetric()
+                
                 # Quantize
-                qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
+                #qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
+                qStudentPath = temp_dir
 
                 # Deploy
                 deployer.connect()
                 deployer.deploy(temp_dir, qStudentPath)
                 deployer.disconnect()
+
+            # Resetting model
+            student.saveWeights(os.path.join(temp_dir,"model_tmp.pth"))
+            student = hydra.utils.instantiate(cfg.student)
+            student.loadWeights(os.path.join(temp_dir,"model_tmp.pth"))
+
 
 if __name__ == "__main__":
     main()

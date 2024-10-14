@@ -2,7 +2,7 @@ _target_: clide.concreteConnector.deployer.packager.sdsp.SDSPPackager
 
 sdspPath: /home/linosbonfi/raid/3.15.0/Toolchain/sdspconv
 inputPersistency: false
-authClient: FILL_WITH_YOUR
-authSecret: FILL_WITH_YOUR
+authClient: 0oa8pb2y9sJHk9ybE697
+authSecret: f616aafUND8Ck82IIwJIGHYspI5DIRPQXQswjA5RRyV2u8PcptYX1J1Edi_rAYUl
 tenantId: 00g4dsbrgt40yTqiI697
 packagerVersion: 6.00.00

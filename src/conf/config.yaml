@@ -2,10 +2,10 @@ log_level: INFO
 
 defaults:
   - _self_
-  - teachers: default
+  - teachers: yolos
   - student: yolo8n
   - datamanager: mongolocal
   - collector: local
   - trainer: ultralytics
   - quantizer: mct
-  - deployer: scp_server
+  - deployer: dummy

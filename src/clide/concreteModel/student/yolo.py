@@ -66,3 +66,11 @@ class Yolo(StudentModel):
     def _inference(self, processed_inputs: Dict[str, torch.Tensor]) -> torch.Tensor:
         results = self.model(processed_inputs["input"])
         return results
+
+    @override
+    def saveWeights(self, path: str):
+        torch.save(self.model.model.model.state_dict(), path)
+                   
+    @override
+    def loadWeights(self, path: str):
+        self.model.model.model.load_state_dict(torch.load(path, weights_only=True))

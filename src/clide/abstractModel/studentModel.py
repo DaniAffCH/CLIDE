@@ -1,6 +1,6 @@
 from torch.nn.modules import Module
 from clide.abstractModel.model import Model
-from abc import ABC
+from abc import ABC, abstractmethod
 import time
 from typing import Optional, List
 
@@ -11,3 +11,11 @@ class StudentModel(Model, ABC):
 
     def trainingStepExecuted(self) -> None:
         self._updateTimestamp = int(round(time.time()))
+
+    @abstractmethod
+    def saveWeights(self, path: str):
+        pass
+
+    @abstractmethod
+    def loadWeights(self, path: str):
+        pass
