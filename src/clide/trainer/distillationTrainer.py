@@ -1,6 +1,7 @@
 from clide.abstractModel.studentModel import StudentModel
 from clide.concreteModel.teacherPool import TeacherPool
 from clide.managers.dataManager import DataManager
+from clide.managers.featureDistillationManager import FeatureDistillationManager
 from clide.adapters.dataset import StubDatasetFactory
 from clide.adapters.ultralytics import batchedTeacherPredictions
 from clide.validator.distillationValidator import UltralyticsValidator
@@ -8,6 +9,8 @@ from ultralytics.utils import LOGGER, colorstr, RANK, TQDM, DEFAULT_CFG
 from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.utils.torch_utils import autocast
 from copy import copy
+from torch import optim, nn
+import torch.nn.functional as F
 import numpy as np
 import torch
 import time
@@ -23,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class UltralyticsTrainer(DetectionTrainer):
 
-    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, dataManager: DataManager, splitRatio: Dict[str, float], cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, featureDistiller: FeatureDistillationManager, dataManager: DataManager, splitRatio: Dict[str, float], distillationAlpha: float, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         cfg.plots = False
         cfg.augment = False
         cfg.workers = 0
@@ -48,6 +51,8 @@ class UltralyticsTrainer(DetectionTrainer):
         self.studentModel = studentModel
         self.datasetFactory = StubDatasetFactory(self.dataManager, splitRatio)
         self.studentModel.model.requires_grad_(True)
+        self.distillationAlpha = distillationAlpha
+        self.featureDistiller = featureDistiller
 
         self.teacherModel = None
         self.reviewerModel = None
@@ -59,6 +64,77 @@ class UltralyticsTrainer(DetectionTrainer):
 
     def updateDataset(self):
         self.datasetFactory.updateData()
+
+    @override
+    def build_optimizer(self, model, name="auto", lr=0.001, momentum=0.9, decay=1e-5, iterations=1e5):
+        """
+        Constructs an optimizer for the given model, based on the specified optimizer name, learning rate, momentum,
+        weight decay, and number of iterations.
+
+        Args:
+            model (torch.nn.Module): The model for which to build an optimizer.
+            name (str, optional): The name of the optimizer to use. If 'auto', the optimizer is selected
+                based on the number of iterations. Default: 'auto'.
+            lr (float, optional): The learning rate for the optimizer. Default: 0.001.
+            momentum (float, optional): The momentum factor for the optimizer. Default: 0.9.
+            decay (float, optional): The weight decay for the optimizer. Default: 1e-5.
+            iterations (float, optional): The number of iterations, which determines the optimizer if
+                name is 'auto'. Default: 1e5.
+
+        Returns:
+            (torch.optim.Optimizer): The constructed optimizer.
+        """
+        g = [], [], []  # optimizer parameter groups
+        bn = tuple(v for k, v in nn.__dict__.items() if "Norm" in k)  # normalization layers, i.e. BatchNorm2d()
+        if name == "auto":
+            LOGGER.info(
+                f"{colorstr('optimizer:')} 'optimizer=auto' found, "
+                f"ignoring 'lr0={self.args.lr0}' and 'momentum={self.args.momentum}' and "
+                f"determining best 'optimizer', 'lr0' and 'momentum' automatically... "
+            )
+            nc = getattr(model, "nc", 10)  # number of classes
+            lr_fit = round(0.002 * 5 / (4 + nc), 6)  # lr0 fit equation to 6 decimal places
+            name, lr, momentum = ("SGD", 0.01, 0.9) if iterations > 10000 else ("AdamW", lr_fit, 0.9)
+            self.args.warmup_bias_lr = 0.0  # no higher than 0.01 for Adam
+
+        for module_name, module in model.named_modules():
+            for param_name, param in module.named_parameters(recurse=False):
+                fullname = f"{module_name}.{param_name}" if module_name else param_name
+                if "bias" in fullname:  # bias (no decay)
+                    g[2].append(param)
+                elif isinstance(module, bn):  # weight (no decay)
+                    g[1].append(param)
+                else:  # weight (with decay)
+                    g[0].append(param)
+
+        if name in {"Adam", "Adamax", "AdamW", "NAdam", "RAdam"}:
+            optimizer = getattr(optim, name, optim.Adam)(g[2], lr=lr, betas=(momentum, 0.999), weight_decay=0.0)
+        elif name == "RMSProp":
+            optimizer = optim.RMSprop(g[2], lr=lr, momentum=momentum)
+        elif name == "SGD":
+            optimizer = optim.SGD(g[2], lr=lr, momentum=momentum, nesterov=True)
+        else:
+            raise NotImplementedError(
+                f"Optimizer '{name}' not found in list of available optimizers "
+                f"[Adam, AdamW, NAdam, RAdam, RMSProp, SGD, auto]."
+                "To request support for addition optimizers please visit https://github.com/ultralytics/ultralytics."
+            )
+        
+        studentHooks = self.studentModel.hookLayers
+        teacherHooks = self.teacherModel.hookLayers
+
+        for s,t in zip(studentHooks, teacherHooks):
+            adaptationLayer = self.featureDistiller.getAdaptationLayer(self.studentModel.name, self.teacherModel.name, s, t)
+            for p in adaptationLayer.adaptationModule.parameters():
+                g[0].append(p) # Add adaptation module
+
+        optimizer.add_param_group({"params": g[0], "weight_decay": decay})  # add g0 with weight_decay
+        optimizer.add_param_group({"params": g[1], "weight_decay": 0.0})  # add g1 (BatchNorm2d weights)
+        LOGGER.info(
+            f"{colorstr('optimizer:')} {type(optimizer).__name__}(lr={lr}, momentum={momentum}) with parameter groups "
+            f'{len(g[1])} weight(decay=0.0), {len(g[0])} weight(decay={decay}), {len(g[2])} bias(decay=0.0)'
+        )
+        return optimizer
 
     @override
     def get_dataset(self):
@@ -85,7 +161,6 @@ class UltralyticsTrainer(DetectionTrainer):
         self.model.args = self.args        
 
     def _do_train(self, world_size=1):
-        
         """Train completed, evaluate and plot if specified by arguments."""
         self.updateDataset()
         self.updateTeacherReviewer()
@@ -128,6 +203,8 @@ class UltralyticsTrainer(DetectionTrainer):
                 self.train_loader.reset()
 
             if RANK in {-1, 0}:
+                if len(self.loss_names) == 3:
+                    self.loss_names += ("im_loss",) 
                 LOGGER.info(self.progress_string())
                 pbar = TQDM(enumerate(self.train_loader), total=nb)
             self.tloss = None
@@ -151,7 +228,7 @@ class UltralyticsTrainer(DetectionTrainer):
                 
                     batch = self.preprocess_batch(batch)
 
-                    teacher_pred = batchedTeacherPredictions(self.teacherModel ,batch["img"])
+                    teacher_pred = batchedTeacherPredictions(self.teacherModel, batch["img"])
 
                     batch["batch_idx"] = teacher_pred["batch_idx"]
                     batch["cls"] = teacher_pred["cls"]
@@ -163,6 +240,22 @@ class UltralyticsTrainer(DetectionTrainer):
                     self.tloss = (
                         (self.tloss * i + self.loss_items) / (i + 1) if self.tloss is not None else self.loss_items
                     )
+
+                    adaptedFeatures = self.featureDistiller.getAdaptedFeatures(self.studentModel.name, self.teacherModel.name)
+
+                    teacherFeatures = adaptedFeatures["teacher"]
+                    studentFeatures = adaptedFeatures["student"]
+
+                    imitationLoss = 0
+
+                    for (sf_key, sf), (tf_key, tf) in zip(studentFeatures.items(), teacherFeatures.items()):
+                        assert sf_key == tf_key, "Keys do not match for student and teacher features"
+
+                        imitationLoss = imitationLoss + F.mse_loss(sf, tf)
+
+                    imitationLoss = imitationLoss * self.distillationAlpha
+
+                    self.loss = self.loss + imitationLoss
 
                 # Backward
                 self.scaler.scale(self.loss).backward()
@@ -186,6 +279,8 @@ class UltralyticsTrainer(DetectionTrainer):
                 mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
                 loss_len = self.tloss.shape[0] if len(self.tloss.shape) else 1
                 losses = self.tloss if loss_len > 1 else torch.unsqueeze(self.tloss, 0)
+                losses = torch.cat((losses, imitationLoss.detach().unsqueeze(0)))
+                loss_len+=1
                 if RANK in {-1, 0}:
                     pbar.set_description(
                         ("%11s" * 2 + "%11.4g" * (2 + loss_len))

@@ -1,6 +1,6 @@
 import random
 from clide.abstractModel.teacherModel import TeacherModel
-from typing import Sequence, Optional, Tuple
+from typing import Sequence, Optional, Tuple, Iterator
 
 # Following singleton design pattern. There should be a unique TeacherPool
 class TeacherPool:
@@ -29,3 +29,6 @@ class TeacherPool:
 
         teacher, reviewer = random.sample(list(self._pool.values()), 2)
         return teacher, reviewer
+    
+    def __iter__(self) -> Iterator[TeacherModel]:
+        return iter(self._pool.values())

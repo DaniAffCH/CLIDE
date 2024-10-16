@@ -1,10 +1,10 @@
 from clide.concreteModel.teacherPool import TeacherPool
+from clide.managers.featureDistillationManager import FeatureDistillationManager
 from omegaconf import DictConfig, OmegaConf
 from enum import Enum
 import tempfile
 import logging
 import hydra
-import torch
 import os
 
 class LogLevel(Enum):
@@ -33,11 +33,11 @@ def main(cfg: DictConfig):
     student = hydra.utils.instantiate(cfg.student)
 
     dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool)
+    featureDistiller = FeatureDistillationManager(student, teacherPool)
     
     collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)
     collector.connect()
 
-    trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
     quantizer = hydra.utils.instantiate(cfg.quantizer)
     deployer = hydra.utils.instantiate(cfg.deployer, studentModel=student)
 
@@ -46,7 +46,7 @@ def main(cfg: DictConfig):
     while True:
         collector.poll()
 
-        trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager)
+        trainer = hydra.utils.instantiate(cfg.trainer, studentModel=student, teacherPool=teacherPool, dataManager = dataManager, featureDistiller = featureDistiller)
         trainer.train()
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -67,6 +67,7 @@ def main(cfg: DictConfig):
             student.saveWeights(os.path.join(temp_dir,"model_tmp.pth"))
             student = hydra.utils.instantiate(cfg.student)
             student.loadWeights(os.path.join(temp_dir,"model_tmp.pth"))
+            featureDistiller.updateModel(student)
 
 
 if __name__ == "__main__":

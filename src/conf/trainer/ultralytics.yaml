@@ -1,4 +1,7 @@
 _target_: clide.trainer.distillationTrainer.UltralyticsTrainer
+
+distillationAlpha: 1
+
 splitRatio: 
     train: 0.75
     val: 0.25
