@@ -149,11 +149,13 @@ class UltralyticsTrainer(DetectionTrainer):
         )
 
     @override
-    def build_dataset(self, img_path, mode="train", batch=None):            
-        return self.datasetFactory(mode)
+    def build_dataset(self, img_path, mode="train", batch=None):  
+        ds = self.datasetFactory(mode)
+        logger.info(f"Built a dataset for {mode} containing {len(ds)} samples")          
+        return ds
     
     @override
-    def get_model(self, cfg=None, weights=None, verbose=True):
+    def get_model(self, cfg=None, weights=None, verbose=False):
         return self.studentModel.model.model
     
     @override
@@ -162,6 +164,7 @@ class UltralyticsTrainer(DetectionTrainer):
 
     def _do_train(self, world_size=1):
         """Train completed, evaluate and plot if specified by arguments."""
+        self.featureDistiller.updateAllHooks()
         self.updateDataset()
         self.updateTeacherReviewer()
 
@@ -250,8 +253,8 @@ class UltralyticsTrainer(DetectionTrainer):
 
                     for (sf_key, sf), (tf_key, tf) in zip(studentFeatures.items(), teacherFeatures.items()):
                         assert sf_key == tf_key, "Keys do not match for student and teacher features"
-
-                        imitationLoss = imitationLoss + F.mse_loss(sf, tf)
+                        importance = batch["importance_map"][self.teacherModel.name].to(sf.device)
+                        imitationLoss = imitationLoss + (importance*(sf - tf) ** 2).mean()
 
                     imitationLoss = imitationLoss * self.distillationAlpha
 

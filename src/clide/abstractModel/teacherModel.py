@@ -1,5 +1,6 @@
 from torch.nn.modules import Module
 from clide.abstractModel.model import Model
+from clide.managers.hookManager import HookType
 from abc import ABC
 from typing import Optional, List
 
@@ -8,6 +9,15 @@ class TeacherModel(Model, ABC):
         super().__init__(model, name, hookLayers)
         self._isVLM = isVLM
         self._prompt = ""
+
+    def bindMasksForImportance(self, masks, scale, probability):
+        self._hookManager._bindMasks(masks, scale, probability)
+
+    def unbindMasksForImportance(self):
+        self._hookManager._unbindMasks()
+
+    def registerHooksForImportance(self, hookList: List[str]):
+        self.registerHooks(hookList, HookType.RandomPruning)
 
     @property
     def prompt(self):

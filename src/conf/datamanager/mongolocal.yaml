@@ -2,8 +2,8 @@ _target_: clide.managers.dataManager.DataManager
 
 dbUri: mongodb://localhost:27017
 dbName: testing_db
-maxSize: 300 MB
-updateRate: 2
-unusedRatioThreshold: 0.35
-minCollectingTime: 30
+maxSize: 500 GB
+updateRate: 5
+unusedRatioThreshold: 0.3
+minCollectingTime: 1200 # 20 min
 cleanFirst: False

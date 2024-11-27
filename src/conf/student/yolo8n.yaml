@@ -1,3 +1,3 @@
 _target_: clide.concreteModel.student.yolo.Yolo
 modelType: YOLOV8N
-hookLayers: ["model.model.4"]
+hookLayers: ["model.model.4.cv2.conv"]

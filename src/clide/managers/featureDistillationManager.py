@@ -1,5 +1,6 @@
 from clide.abstractModel.studentModel import StudentModel
 from clide.concreteModel.teacherPool import TeacherPool
+from clide.managers.hookManager import HookType
 from collections import OrderedDict
 from dataclasses import dataclass
 import torch.nn as nn
@@ -38,7 +39,7 @@ class FeatureDistillationManager:
         self._modelMap: Dict[str, StudentModel | TeacherPool] = {}
 
         studentLayers = studentModel.hookLayers
-        studentModel.registerHooks(studentLayers)
+        studentModel.registerHooks(studentLayers, HookType.Standard)
         self._modelMap[studentModel.name] = studentModel
 
         for t in teacherPool:
@@ -56,14 +57,19 @@ class FeatureDistillationManager:
                 toc = t.getOutputChannels(tl)
                 studentLayerInfo = LayerInfo(studentModel.name, sl, soc, True)
                 teacherLayerInfo = LayerInfo(t.name, tl, toc, False)
-                kernelSize = 3
-                # TODO: fix data type, hardcoded for now
+                kernelSize = 3 # TODO: parameter
                 adaptation = nn.Conv2d(soc, toc, kernelSize, padding=kernelSize // 2)
 
                 key = AdaptationKey(studentModel.name, t.name, sl, tl)
                 self._adaptationMap[key] = AdaptationLayer(studentLayerInfo, teacherLayerInfo, adaptation)
 
-            t.registerHooks(teacherLayers)
+            t.registerHooks(teacherLayers, HookType.Standard)
+
+    def updateAllHooks(self):
+        for model in self._modelMap.values():
+            model.removeHooks()
+            layers = model.hookLayers
+            model.registerHooks(layers, HookType.Standard)
 
     def getAdaptationLayer(self, studentName: str, teacherName: str, studentLayerName: str, teacherLayerName: str) -> AdaptationLayer:
         key = AdaptationKey(studentName, teacherName, studentLayerName, teacherLayerName)
@@ -86,7 +92,7 @@ class FeatureDistillationManager:
         if model.name not in self._modelMap:
             raise KeyError(f"Model {model.name} is not a registered model")
         modelLayers = model.hookLayers
-        model.registerHooks(modelLayers)
+        model.registerHooks(modelLayers, HookType.Standard)
         self._modelMap[model.name] = model
     
     def getFeatures(self, modelName: str) -> Dict[str, torch.Tensor]:
@@ -105,7 +111,7 @@ class FeatureDistillationManager:
         for (studentFeatureName, studentFeature), (teacherFeatureName, teacherFeature) in zip(studentFeatures.items(), teacherFeatures.items()):
             adaptation = self.getAdaptationLayer(studentModelName, teacherModelName, studentFeatureName, teacherFeatureName)
 
-            # TODO: studentModel.requires_grad FIX THIS
+            # TODO: deve essere uguale a studentModel.requires_grad FIX THIS
             adaptation.adaptationModule.requires_grad_(True)
 
             adaptation.adaptationModule.to(studentFeature.device)
@@ -116,7 +122,7 @@ class FeatureDistillationManager:
             assert (
                 adaptedFeatures["teacher"][teacherFeatureName].shape == adaptedFeatures["student"][studentFeatureName].shape
             ), (
-                f"Adapted features don't have the same shape:\n"
+                f"Adapted features don't match:\n"
                 f"Teacher {teacherModelName} feature '{teacherFeatureName}' shape: {adaptedFeatures['teacher'][teacherFeatureName].shape},\n"
                 f"Student {studentModelName} feature '{studentFeatureName}' shape: {adaptedFeatures['student'][studentFeatureName].shape}."
             )

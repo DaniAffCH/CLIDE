@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional    
 import torch
 from torch import nn
-from clide.managers.hookManager import HookManager
+from clide.managers.hookManager import HookManager, HookType
 from transformers.image_utils import ImageInput
 from clide.adapters.tasks import TaskType, KeyMapping, TaskResult
 from collections import OrderedDict
@@ -20,7 +20,7 @@ class Model(ABC):
         assert "output" not in hookLayers
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._model.to(self._device)
-        self._taskType = TaskType.DETECTION # TODO: this should be related to a config
+        self._taskType = TaskType.DETECTION # TODO: this should be taken from config
         
 
     def _computeModelSize(self) -> int:
@@ -38,25 +38,10 @@ class Model(ABC):
         if layer is None:
             raise ValueError(f"Layer '{layer_name}' not found in the model.")
 
-        if list(layer.children()):
-            first_valid_layer = None
-
-            # Iterate through the submodules of the specified layer
-            for _, submodule in layer.named_modules():
-                if isinstance(submodule, (nn.Conv2d, nn.Linear)):
-                    first_valid_layer = submodule
-                    break
-        else:
-            first_valid_layer = layer if isinstance(layer, (nn.Conv2d, nn.Linear)) else None
-
-        if first_valid_layer is None:
-            raise TypeError(f"No supported layer found in the specified layer '{layer_name}'.")
-
-        # Return output channels or features of the first valid layer
-        if isinstance(first_valid_layer, nn.Conv2d):
-            return first_valid_layer.out_channels
-        elif isinstance(first_valid_layer, nn.Linear):
-            return first_valid_layer.out_features
+        if isinstance(layer, nn.Conv2d):
+            return layer.out_channels
+        elif isinstance(layer, nn.Linear):
+            return layer.out_features
         else:
             raise TypeError(f"Layer '{layer_name}' is not supported for output channel extraction.")
 
@@ -90,8 +75,11 @@ class Model(ABC):
             out.pop("output", None)
         return out
     
-    def registerHooks(self, hookList: List[str]) -> None:
-        self._hookManager.registerHooks(hookList)
+    def registerHooks(self, hookList: List[str], type: HookType) -> None:
+        self._hookManager.registerHooks(hookList, type)
+
+    def removeHooks(self):
+        self._hookManager.removeHooks()
 
     @abstractmethod
     def _getKeyMapping(self) -> KeyMapping:

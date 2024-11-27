@@ -3,8 +3,9 @@ from typing import List
 import io
 from PIL import Image
 from clide.managers.dataManager import DataManager
+from clide.adapters.preprocess import preprocessImage
 import torch
-from ultralytics.data.augment import LetterBox
+
 import numpy as np
 import random
 import logging
@@ -15,7 +16,6 @@ class StubDataset(Dataset):
     def __init__(self, dataManager: DataManager, data: List[str]):
         self.dataManager = dataManager
         self.data = data
-        self.lb = LetterBox() # TODO set params
 
     def __len__(self):
         '''
@@ -27,26 +27,24 @@ class StubDataset(Dataset):
         '''
         Fetch an image and its annotation based on the index.
         '''
-        image_id = self.data[idx]
-        image_data, annotation = self.dataManager.getImage(image_id)
-        
-        image = Image.open(io.BytesIO(image_data)).convert('RGB')
+        sampleId = self.data[idx]
+        sample = self.dataManager.getSample(sampleId)
 
-        adjusted_image = self.lb(image=np.array(image))
-        image_tensor = torch.tensor(adjusted_image, dtype=torch.uint8).permute(2, 0, 1)
-        # TODO: return some kind of annotation?
+        image_tensor = preprocessImage(sample.image)
+
         return {
             "img":image_tensor,
             "ori_shape":torch.tensor([640,640]),
             "ratio_pad":torch.tensor([[1,1],[0,0]]),
-            "img_id":image_id
+            "importance_map":sample.importanceMap,
+            "img_id":sampleId
         }
 
 class StubDatasetFactory:
     def __init__(self, dataManager: DataManager, splitRatio: dict) -> None:
         assert len(splitRatio) <= 3, "Expected at most 3 keys in splitRatio for train, val, and optional test splits"
         assert "train" in splitRatio and "val" in splitRatio, "Missing 'train' or 'val' key in splitRatio"
-        assert sum(splitRatio.values()) > 0.99, "The sum of split ratios must be approximately 1"
+        assert sum(splitRatio.values()) > 0.999, "The sum of split ratios must be 1"
         if len(splitRatio) == 3:
             assert "test" in splitRatio, "Missing 'test' key in splitRatio when specifying 3 splits"
         self.dataManager = dataManager

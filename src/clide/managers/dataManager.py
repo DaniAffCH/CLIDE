@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 from clide.concreteModel.teacherPool import TeacherPool
+from clide.distiller.importanceDistiller import ImportanceDistiller
 from pymongo import MongoClient
 from typing import Dict
 import gridfs
@@ -7,13 +9,19 @@ from datetime import datetime
 from typing import List
 import humanfriendly
 import io
-from PIL import Image
 import numpy as np
 import logging
 import torch
 import time
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class Sample:
+    image: torch.Tensor
+    importanceMap: Dict[str, torch.Tensor]
+    annotation: int 
+
 class DataManager:
     def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, cleanFirst: bool = False) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
@@ -34,52 +42,15 @@ class DataManager:
         assert 0. <= unusedRatioThreshold <= 1., "unusedRatioThreshold must be between 0 and 1 (included)"
         self._minCollectingTime = minCollectingTime
 
+        # |-_|
+        self.importanceDistiller = ImportanceDistiller([(1,1),(2,2),(4,4),(8,8),(16,16)], [0.5,0.6,0.6,0.7,0.7], 640, 64)
+
         logger.info(f"Connection to db established")
-        self._restoreConsistency()
+        self.checkAndRestoreConsistency()
+
 
     def startCollectionSession(self):
         self._collectionTimer = time.time()
-
-    def _restoreConsistency(self):
-        pipeline = [
-        {
-            "$lookup": {
-                "from": "metadata",
-                "localField": "_id",
-                "foreignField": "_id",
-                "as": "match"
-            }
-        },
-        {
-            "$unwind": {
-                "path": "$match",
-                "preserveNullAndEmptyArrays": True
-            }
-        },
-        {
-            "$match": {
-                "match": None
-            }
-        },
-        {
-            "$project": {
-                "_id": 1
-            }
-        }
-        ]
-
-        missingKeys = self._db.fs.files.aggregate(pipeline)
-
-        changed = False
-        for res in missingKeys:
-            self._deleteFile(res["_id"])
-            changed = True
-        
-        if changed:
-            logger.info(f"Database consistency restored.")
-
-        # TODO: is the other way around needed?
-
 
     def _calculateInitialSize(self) -> int:
         total_size = 0
@@ -91,7 +62,7 @@ class DataManager:
         # TODO: find the correct way of selecting a victim. Currently RANDOM.
 
         random_doc = list(self._db.metadata.aggregate([{"$sample": {"size": 1}}]))
-        return random_doc[0]['_id'] if random_doc else None
+        return random_doc[0] if random_doc else None
 
     def _annotateImage(self, imageData: np.ndarray) -> Dict[str, torch.Tensor]:
         annotator = self._teacherPool.getRandomModel()
@@ -99,6 +70,9 @@ class DataManager:
 
         # TODO: this should be related to the type of task. Assuming Detection for now
         return label["output"].classes
+    
+    def _estimateFeatureImportance(self, imageData: np.ndarray):
+        return {t.name: self.importanceDistiller(t,imageData).cpu() for t in self._teacherPool}
 
     def _unusedRatio(self) -> float:
         '''
@@ -118,14 +92,45 @@ class DataManager:
 
         return ratio
 
-    def _checkConsistency(self):
-        fsFilesN = self._db.fs.files.count_documents({})
-        metadataN = self._db.metadata.count_documents({})
+    def checkAndRestoreConsistency(self):
+        # Get all _id values from the metadata collection
+        metadata_cursor = self._db.metadata.find({}, {'_id': 1, 'importance_ids': 1})
+        
+        # Collect all file IDs referenced by metadata
+        used_files = set()
+        
+        # Collect referenced files (image _id + importance_id list)
+        for metadata in metadata_cursor:
+            # Add the image _id to used_files
+            image_id = metadata['_id']
+            used_files.add(str(image_id))  # Add image _id to used_files
+            
+            # Add all importance_id values to used_files
+            for importance_id in metadata['importance_ids'].values():
+                used_files.add(str(importance_id))  # Add importance_id to used_files
 
-        if fsFilesN != metadataN:
-            error_message = f"Filesystem - metadata mismatch: fs.files count = {fsFilesN}, metadata count = {metadataN}"
-            logger.error(error_message)
-            raise RuntimeError(error_message)
+        # Get all file IDs in fs.files
+        fs_files = self._db.fs.files.find()
+        fs_file_ids = {str(file['_id']): file for file in fs_files}  # Map of file _id to file document in fs
+
+        # Find unreferenced files (i.e., files that are in fs but not in used_files)
+        pending_files = set(fs_file_ids.keys()) - used_files
+        
+        # Handle unreferenced files
+        if pending_files:
+            for file_id in pending_files:
+                file_doc = fs_file_ids[file_id]
+                file_name = file_doc.get('filename', 'unknown')
+                
+                try:
+                    self._deleteFile(file_id) 
+                    logger.info(f"Removed unreferenced file: {file_name} ({file_id})")
+                except Exception as e:
+                    logger.error(f"Error removing file {file_id}: {str(e)}")
+        else:
+            logger.info("No unreferenced files to remove in fs.")
+        
+        logger.info("Consistency check and restoration completed.")
 
     def addImage(self, imageData: np.ndarray):
             # limit the update frequency
@@ -134,54 +139,81 @@ class DataManager:
             with self._dbClient.start_session() as session:
                 with session.start_transaction():
                     # Convert np.ndarray to bytes
-                    imagePil = Image.fromarray(imageData)
-                    with io.BytesIO() as output:
-                        imagePil.save(output, format="JPEG")
-                        imageBytes = output.getvalue()
+                    image = torch.tensor(imageData)
 
-                    imageName = f"img_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.jpg"
-                    imageSize = len(imageBytes)
+                    annotation = self._annotateImage(imageData)
+                    importanceMap = self._estimateFeatureImportance(imageData)
+
+                    with io.BytesIO() as output:
+                        torch.save(image, output)
+                        imageSerialized = output.getvalue()
+
+                    with io.BytesIO() as buffer:
+                        importanceMapSerialized = dict()
+                        
+                        for n, i in importanceMap.items():
+                            buffer.seek(0)
+                            buffer.truncate(0)
+                            torch.save(i, buffer)
+                            importanceMapSerialized[n] = buffer.getvalue()
+
+                    now = datetime.now().strftime('%Y%m%d%H%M%S%f')
+
+                    importanceSize = sum(len(v) for v in importanceMapSerialized.values())         
+                    imageSize = len(imageSerialized)
+
+                    imageName = f"img_{now}.jpg"
 
                     # Ensure the dataset size does not exceed the maximum size
-                    while self._currentSize + imageSize > self._maxSize:
-                        victimId = self._selectVictim()
-                        if victimId:
-                            self.removeImage(victimId)
+                    while self._currentSize + imageSize + importanceSize > self._maxSize:
+                        victim = self._selectVictim()
+                        if victim:
+                            self.removeSample(victim)
                         else:
                             raise RuntimeError("No image to remove but the dataset is over capacity.")
 
                     self._updateTimer = time.time()
 
                     self._currentSize += imageSize
+                    self._currentSize += importanceSize
 
-                    imageId = self._fs.put(imageBytes, filename=imageName)
-
-                    annotation = self._annotateImage(imageData)
+                    imageId = self._fs.put(imageSerialized, filename=imageName)
+                    importanceIds = {k : self._fs.put(v, filename=f"imp_{now}_{k}.pt") for k,v in importanceMapSerialized.items()}
 
                     # Store metadata and annotation
                     metadata = {
                         '_id': imageId,
                         'filename': imageName,
                         'upload_date': datetime.now(),
+                        'importance_ids': importanceIds,
                         'annotation': annotation,
                         'used': False
                     }
                     self._db.metadata.insert_one(metadata)
 
-                    self._checkConsistency()
-
-    def getImage(self, imageId):
+    def getSample(self, imageId) -> Sample:
         imageData = self._fs.get(ObjectId(imageId)).read()
 
+        with io.BytesIO(imageData) as input_buffer:
+            image = torch.load(input_buffer)
+
         metadata = self._db.metadata.find_one({'_id': ObjectId(imageId)})
-        if metadata:
-            return imageData, metadata['annotation']
-        else:
-            raise KeyError(f"No such image: {imageId}")
-        
+
+        importanceMap = {}
+
+        for k, importanceId in metadata["importance_ids"].items():
+            importanceData = self._fs.get(ObjectId(importanceId)).read()
+            
+            with io.BytesIO(importanceData) as input_buffer:
+                importance = torch.load(input_buffer)
+
+            importanceMap[k] = importance
+
+        return Sample(image, importanceMap, metadata["annotation"])
+
     def getAllIds(self) -> List[str]:
         '''
-        Returns a List of image ids.
+        Returns a List of sample ids.
         '''
         dataset = []
         cursor = self._db.metadata.find({}, {'_id': 1})
@@ -208,15 +240,24 @@ class DataManager:
     def _deleteMetadata(self, id: str):
         self._db.metadata.delete_one({'_id': ObjectId(id)})
 
-    def removeImage(self, image_id):
+    def removeSample(self, metadata):
         with self._dbClient.start_session() as session:
             with session.start_transaction():
+
+                image_id = metadata['_id']
+                importance_ids = metadata.get('importance_ids').values()
+
                 imageLength = self._db.fs.files.find_one({'_id': ObjectId(image_id)})['length']
-                
+
                 self._deleteFile(image_id)
                 self._deleteMetadata(image_id)
-                
+
                 self._currentSize -= imageLength
+
+                for importance_id in importance_ids:
+                    importanceLength = self._db.fs.files.find_one({'_id': ObjectId(importance_id)})['length']
+                    self._deleteFile(importance_id)
+                    self._currentSize -= importanceLength
 
     def __del__(self):
         self._dbClient.close()

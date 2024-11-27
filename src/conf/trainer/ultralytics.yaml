@@ -7,5 +7,5 @@ splitRatio:
     val: 0.25
 
 overrides:
-    patience: 10
-    epochs: 1
+    patience: 5
+    epochs: 30
