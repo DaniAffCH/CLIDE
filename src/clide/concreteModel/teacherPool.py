@@ -1,6 +1,6 @@
 import random
 from clide.abstractModel.teacherModel import TeacherModel
-from typing import Sequence, Optional, Tuple, Iterator
+from typing import Sequence, Optional, Tuple, Iterator, List
 
 # Following singleton design pattern. There should be a unique TeacherPool
 class TeacherPool:
@@ -23,12 +23,13 @@ class TeacherPool:
     def getRandomModel(self) -> TeacherModel:
         return random.choice(list(self._pool.values()))
     
-    def teacherReviewerSplit(self) -> Tuple[TeacherModel,TeacherModel]:
+    def teacherReviewersSplit(self) -> Tuple[TeacherModel,List[TeacherModel]]:
         if len(self._pool) < 2:
             raise ValueError("There must be at least two models in the pool to split.")
 
-        teacher, reviewer = random.sample(list(self._pool.values()), 2)
-        return teacher, reviewer
+        teacher = random.choice(list(self._pool.values()))
+        reviewers = [model for model in self._pool.values() if model != teacher]
+        return teacher, reviewers
     
     def __iter__(self) -> Iterator[TeacherModel]:
         return iter(self._pool.values())

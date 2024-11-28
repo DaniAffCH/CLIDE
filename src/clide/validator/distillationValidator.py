@@ -7,14 +7,15 @@ from ultralytics.nn.autobackend import AutoBackend
 from ultralytics.utils.checks import check_imgsz
 from ultralytics.utils.ops import Profile
 from ultralytics.utils import LOGGER, TQDM, callbacks, colorstr
+from typing import List
 import json
 import torch
 from ultralytics.data import converter
 from ultralytics.utils.metrics import ConfusionMatrix
 
 class UltralyticsValidator(DetectionValidator):
-    def __init__(self, reviewerModel: TeacherModel, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
-        self.reviewerModel = reviewerModel
+    def __init__(self, reviewerModels: List[TeacherModel], dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
+        self.reviewerModels = reviewerModels
         super().__init__(dataloader, save_dir, pbar, args, _callbacks)
 
     def init_metrics(self, model):
@@ -32,12 +33,12 @@ class UltralyticsValidator(DetectionValidator):
         self.jdict = []
         self.stats = dict(tp=[], conf=[], pred_cls=[], target_cls=[], target_img=[])
 
-    def preprocess(self, batch):
+    def preprocess(self, batch, reviewerModel: TeacherModel):
         """Preprocesses batch of images for YOLO training."""
         batch["img"] = batch["img"].to(self.device, non_blocking=True)
         batch["img"] = (batch["img"].half() if self.args.half else batch["img"].float()) / 255
 
-        reviewerPred = batchedTeacherPredictions(self.reviewerModel, batch["img"])
+        reviewerPred = batchedTeacherPredictions(reviewerModel, batch["img"])
 
         batch["batch_idx"] = reviewerPred["batch_idx"]
         batch["cls"] = reviewerPred["cls"]
@@ -114,34 +115,35 @@ class UltralyticsValidator(DetectionValidator):
         self.jdict = []  # empty before each val
         for batch_i, batch in enumerate(bar):
             self.run_callbacks("on_val_batch_start")
-            self.batch_i = batch_i
+            for reviewerModel in self.reviewerModels: 
+                self.batch_i = batch_i
 
-            # Preprocess
-            with dt[0]:
-                batch = self.preprocess(batch)
+                # Preprocess
+                with dt[0]:
+                    batch = self.preprocess(batch, reviewerModel)
 
-            # Inference
-            with dt[1]:
-                preds = model(batch["img"], augment=augment)
+                # Inference
+                with dt[1]:
+                    preds = model(batch["img"], augment=augment)
 
-            # Loss
-            with dt[2]:
-                if self.training:
-                    self.loss += model.loss(batch, preds)[1]
+                # Loss
+                with dt[2]:
+                    if self.training:
+                        self.loss += model.loss(batch, preds)[1]
 
-            # Postprocess
-            with dt[3]:
-                preds = self.postprocess(preds)
+                # Postprocess
+                with dt[3]:
+                    preds = self.postprocess(preds)
 
-            self.update_metrics(preds, batch)
-            if self.args.plots and batch_i < 3:
-                self.plot_val_samples(batch, batch_i)
-                self.plot_predictions(batch, preds, batch_i)
+                self.update_metrics(preds, batch)
+                if self.args.plots and batch_i < 3:
+                    self.plot_val_samples(batch, batch_i)
+                    self.plot_predictions(batch, preds, batch_i)
 
             self.run_callbacks("on_val_batch_end")
         stats = self.get_stats()
         self.check_stats(stats)
-        self.speed = dict(zip(self.speed.keys(), (x.t / len(self.dataloader.dataset) * 1e3 for x in dt)))
+        self.speed = dict(zip(self.speed.keys(), (x.t / (len(self.dataloader.dataset)*len(self.reviewerModels)) * 1e3 for x in dt)))
         self.finalize_metrics()
         self.print_results()
         self.run_callbacks("on_val_end")

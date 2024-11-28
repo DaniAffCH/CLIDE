@@ -55,12 +55,12 @@ class UltralyticsTrainer(DetectionTrainer):
         self.featureDistiller = featureDistiller
 
         self.teacherModel = None
-        self.reviewerModel = None
+        self.reviewerModels = None
         
-    def updateTeacherReviewer(self):
-        self.teacherModel, self.reviewerModel = self.teacherPool.teacherReviewerSplit()
+    def updateTeacherReviewers(self):
+        self.teacherModel, self.reviewerModels = self.teacherPool.teacherReviewersSplit()
         logger.info(f"Teacher Model: {self.teacherModel.name}")
-        logger.info(f"Reviewer Model: {self.reviewerModel.name}")
+        logger.info(f"Reviewer Models: " + ", ".join([reviewerModel.name for reviewerModel in self.reviewerModels]))
 
     def updateDataset(self):
         self.datasetFactory.updateData()
@@ -145,7 +145,7 @@ class UltralyticsTrainer(DetectionTrainer):
         """Returns a DetectionValidator for YOLO model validation."""
         self.loss_names = "box_loss", "cls_loss", "dfl_loss"
         return UltralyticsValidator(
-            self.reviewerModel, self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
+            self.reviewerModels, self.test_loader, save_dir=self.save_dir, args=copy(self.args), _callbacks=self.callbacks
         )
 
     @override
@@ -166,7 +166,7 @@ class UltralyticsTrainer(DetectionTrainer):
         """Train completed, evaluate and plot if specified by arguments."""
         self.featureDistiller.updateAllHooks()
         self.updateDataset()
-        self.updateTeacherReviewer()
+        self.updateTeacherReviewers()
 
         if world_size > 1:
             self._setup_ddp(world_size)
