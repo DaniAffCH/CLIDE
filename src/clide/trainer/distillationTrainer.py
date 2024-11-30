@@ -5,6 +5,7 @@ from clide.managers.featureDistillationManager import FeatureDistillationManager
 from clide.adapters.dataset import StubDatasetFactory
 from clide.adapters.ultralytics import batchedTeacherPredictions
 from clide.validator.distillationValidator import UltralyticsValidator
+from clide.trainer.loss import KDv8DetectionLoss
 from ultralytics.utils import LOGGER, colorstr, RANK, TQDM, DEFAULT_CFG
 from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.utils.torch_utils import autocast
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class UltralyticsTrainer(DetectionTrainer):
 
-    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, featureDistiller: FeatureDistillationManager, dataManager: DataManager, splitRatio: Dict[str, float], distillationAlpha: float, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, featureDistiller: FeatureDistillationManager, dataManager: DataManager, splitRatio: Dict[str, float], distillationAlpha: float, useSoftLabels: bool, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         cfg.plots = False
         cfg.augment = False
         cfg.workers = 0
@@ -43,7 +44,10 @@ class UltralyticsTrainer(DetectionTrainer):
         cfg.fliplr=0.
         cfg.erasing=0.
         cfg.crop_fraction=0.
-    
+        
+        cfg.model = studentModel.model.model.args["model"]
+        cfg.device =  studentModel.model.model.args["device"]
+        
         super().__init__(cfg, overrides, _callbacks)
         
         self.dataManager = dataManager
@@ -53,6 +57,10 @@ class UltralyticsTrainer(DetectionTrainer):
         self.studentModel.model.requires_grad_(True)
         self.distillationAlpha = distillationAlpha
         self.featureDistiller = featureDistiller
+        self.useSoftLabels = useSoftLabels
+        
+        self.studentModel.model.model.args = self.args        
+        self.set_criterion(self.studentModel)
 
         self.teacherModel = None
         self.reviewerModels = None
@@ -135,6 +143,9 @@ class UltralyticsTrainer(DetectionTrainer):
             f'{len(g[1])} weight(decay=0.0), {len(g[0])} weight(decay={decay}), {len(g[2])} bias(decay=0.0)'
         )
         return optimizer
+
+    def set_criterion(self, student: StudentModel):
+        student.model.model.criterion = KDv8DetectionLoss(student.model.model, self.useSoftLabels)
 
     @override
     def get_dataset(self):
@@ -236,7 +247,7 @@ class UltralyticsTrainer(DetectionTrainer):
                     batch["batch_idx"] = teacher_pred["batch_idx"]
                     batch["cls"] = teacher_pred["cls"]
                     batch["bboxes"] = teacher_pred["bboxes"]
-
+                    batch["conf"] = teacher_pred["conf"]
                     self.loss, self.loss_items = self.model(batch)
                     if RANK != -1:
                         self.loss *= world_size
@@ -257,7 +268,7 @@ class UltralyticsTrainer(DetectionTrainer):
                         imitationLoss = imitationLoss + (importance*(sf - tf) ** 2).mean()
 
                     imitationLoss = imitationLoss * self.distillationAlpha
-
+                    
                     self.loss = self.loss + imitationLoss
 
                 # Backward

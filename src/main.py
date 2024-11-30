@@ -62,6 +62,8 @@ def main(cfg: DictConfig):
                 deployer.connect()
                 deployer.deploy(temp_dir, qStudentPath)
                 deployer.disconnect()
+            else:
+                logger.info(f"Monitor Metric didn't improve. Best is {bestMetric}")
 
             # Resetting model
             student.saveWeights(os.path.join(temp_dir,"model_tmp.pth"))

@@ -43,6 +43,7 @@ class UltralyticsValidator(DetectionValidator):
         batch["batch_idx"] = reviewerPred["batch_idx"]
         batch["cls"] = reviewerPred["cls"]
         batch["bboxes"] = reviewerPred["bboxes"]
+        batch["conf"] = reviewerPred["conf"]
 
         for k in ["batch_idx", "cls", "bboxes"]:
             batch[k] = batch[k].to(self.device)

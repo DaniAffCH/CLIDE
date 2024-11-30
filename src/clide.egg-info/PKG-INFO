@@ -1,7 +1,7 @@
 Metadata-Version: 2.1
 Name: clide
 Version: 0.1.0
-Summary: Continual Learning with Importance Distillation for Edge devices framework
+Summary: Foundation Edge Distillation Architecture
 Author-email: Daniele Affinita <daniele.affinita@sony.com>
 Requires-Python: >=3.7
 Description-Content-Type: text/markdown
@@ -17,7 +17,7 @@ Requires-Dist: timm
 Requires-Dist: pymongo
 Requires-Dist: av
 Requires-Dist: humanfriendly
-Requires-Dist: ultralytics
+Requires-Dist: ultralytics>=8.3.7
 Requires-Dist: cython
 Requires-Dist: omegaconf
 Requires-Dist: hydra-core
@@ -28,6 +28,6 @@ Requires-Dist: model-compression-toolkit>=2.2.0
 Requires-Dist: sony_custom_layers
 
 # CLIDE
-Continual Learning with Importance Distillation for Edge devices framework
+Continual Learning with Importance Distillation for Edge devices framework.
 
-![UML Architecture](assets/clide_v3.0.png)
+![UML Architecture](assets/feda(1).gif)

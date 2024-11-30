@@ -8,7 +8,6 @@ import logging
 from pathlib import Path
 from PIL import Image
 import cv2
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +47,7 @@ class FileCollector(RemoteCollector):
                 yield img
 
         logger.info("Streaming images are over")
+        self._isConnected = False
 
     @override
     def isAlive(self) -> bool:
