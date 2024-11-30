@@ -3,7 +3,7 @@ _target_: clide.trainer.distillationTrainer.UltralyticsTrainer
 distillationAlpha: 1
 useSoftLabels: True
 useFeatureDistillation: True
-useImportanceEstimation: True
+useImportanceEstimation: False
 
 splitRatio: 
     train: 0.75

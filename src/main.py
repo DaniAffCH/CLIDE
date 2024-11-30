@@ -32,7 +32,7 @@ def main(cfg: DictConfig):
 
     student = hydra.utils.instantiate(cfg.student)
 
-    dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool)
+    dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool, useImportanceEstimation=cfg.trainer.useImportanceEstimation)
     featureDistiller = FeatureDistillationManager(student, teacherPool)
     
     collector = hydra.utils.instantiate(cfg.collector, dataManager=dataManager)

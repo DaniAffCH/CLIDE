@@ -45,6 +45,7 @@ class KDTaskAlignedAssigner(nn.Module):
             gt_labels (Tensor): shape(bs, n_max_boxes, 1)
             gt_bboxes (Tensor): shape(bs, n_max_boxes, 4)
             mask_gt (Tensor): shape(bs, n_max_boxes, 1)
+            gt_conf (Tensor): shape(bs, n_max_boxes, 1)            
 
         Returns:
             target_labels (Tensor): shape(bs, num_total_anchors)
@@ -288,7 +289,7 @@ class KDv8DetectionLoss:
 
         self.use_dfl = m.reg_max > 1
 
-        self.assigner = KDTaskAlignedAssigner(topk=tal_topk, num_classes=self.nc, alpha=0.5, beta=6.0, softLables=self.softLabels)
+        self.assigner = KDTaskAlignedAssigner(topk=tal_topk, num_classes=self.nc, alpha=0.5, beta=6.0, softLabels=self.softLabels)
         self.bbox_loss = BboxLoss(m.reg_max).to(device)
         self.proj = torch.arange(m.reg_max, dtype=torch.float, device=device)
 
@@ -354,7 +355,7 @@ class KDv8DetectionLoss:
             gt_labels,
             gt_bboxes,
             mask_gt,
-            gt_conf
+            gt_conf,
         )
 
         target_scores_sum = max(target_scores.sum(), 1)

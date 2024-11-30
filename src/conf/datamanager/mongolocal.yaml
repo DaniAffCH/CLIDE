@@ -5,5 +5,5 @@ dbName: testing_db
 maxSize: 500 GB
 updateRate: 5
 unusedRatioThreshold: 0.3
-minCollectingTime: 3600 # 60 min
+minCollectingTime: 300 # 3600 # 60 min
 cleanFirst: True

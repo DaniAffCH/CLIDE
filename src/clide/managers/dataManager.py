@@ -23,7 +23,7 @@ class Sample:
     annotation: int 
 
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, cleanFirst: bool = False) -> None:
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, useImportanceEstimation: bool, cleanFirst: bool = False) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
         self.dbName = dbName
         self._teacherPool = teacherPool
@@ -39,11 +39,13 @@ class DataManager:
         self._loggingTimer = time.time()
         self._updateRate = updateRate # in seconds 
         self._unusedRatioThreshold = unusedRatioThreshold
+        self._useImportanceEstimation = useImportanceEstimation
         assert 0. <= unusedRatioThreshold <= 1., "unusedRatioThreshold must be between 0 and 1 (included)"
         self._minCollectingTime = minCollectingTime
 
         # |-_|
-        self.importanceDistiller = ImportanceDistiller([(1,1),(2,2),(4,4),(8,8),(16,16)], [0.5,0.6,0.6,0.7,0.7], 640, 64)
+        if self._useImportanceEstimation:
+            self.importanceDistiller = ImportanceDistiller([(1,1),(2,2),(4,4),(8,8),(16,16)], [0.5,0.6,0.6,0.7,0.7], 640, 64)
 
         logger.info(f"Connection to db established")
         self.checkAndRestoreConsistency()
@@ -142,30 +144,35 @@ class DataManager:
                     image = torch.tensor(imageData)
 
                     annotation = self._annotateImage(imageData)
-                    importanceMap = self._estimateFeatureImportance(imageData)
-
+                    
                     with io.BytesIO() as output:
                         torch.save(image, output)
                         imageSerialized = output.getvalue()
-
-                    with io.BytesIO() as buffer:
-                        importanceMapSerialized = dict()
                         
-                        for n, i in importanceMap.items():
-                            buffer.seek(0)
-                            buffer.truncate(0)
-                            torch.save(i, buffer)
-                            importanceMapSerialized[n] = buffer.getvalue()
+                    if self._useImportanceEstimation:
+                        importanceMap = self._estimateFeatureImportance(imageData)
+                        with io.BytesIO() as buffer:
+                            importanceMapSerialized = dict()
+                            
+                            for n, i in importanceMap.items():
+                                buffer.seek(0)
+                                buffer.truncate(0)
+                                torch.save(i, buffer)
+                                importanceMapSerialized[n] = buffer.getvalue()
 
                     now = datetime.now().strftime('%Y%m%d%H%M%S%f')
 
-                    importanceSize = sum(len(v) for v in importanceMapSerialized.values())         
                     imageSize = len(imageSerialized)
-
+                    requestSize = imageSize
+                    
+                    if self._useImportanceEstimation:
+                        importanceSize = sum(len(v) for v in importanceMapSerialized.values())      
+                        requestSize += importanceSize   
+                        
                     imageName = f"img_{now}.jpg"
 
                     # Ensure the dataset size does not exceed the maximum size
-                    while self._currentSize + imageSize + importanceSize > self._maxSize:
+                    while self._currentSize + requestSize > self._maxSize:
                         victim = self._selectVictim()
                         if victim:
                             self.removeSample(victim)
@@ -174,21 +181,23 @@ class DataManager:
 
                     self._updateTimer = time.time()
 
-                    self._currentSize += imageSize
-                    self._currentSize += importanceSize
+                    self._currentSize += requestSize
 
                     imageId = self._fs.put(imageSerialized, filename=imageName)
-                    importanceIds = {k : self._fs.put(v, filename=f"imp_{now}_{k}.pt") for k,v in importanceMapSerialized.items()}
-
+                    
                     # Store metadata and annotation
                     metadata = {
                         '_id': imageId,
                         'filename': imageName,
                         'upload_date': datetime.now(),
-                        'importance_ids': importanceIds,
                         'annotation': annotation,
                         'used': False
                     }
+                    
+                    if self._useImportanceEstimation:
+                        importanceIds = {k : self._fs.put(v, filename=f"imp_{now}_{k}.pt") for k,v in importanceMapSerialized.items()}
+                        metadata['importance_ids'] = importanceIds
+                        
                     self._db.metadata.insert_one(metadata)
 
     def getSample(self, imageId) -> Sample:
@@ -200,14 +209,15 @@ class DataManager:
         metadata = self._db.metadata.find_one({'_id': ObjectId(imageId)})
 
         importanceMap = {}
+        
+        if self._useImportanceEstimation:
+            for k, importanceId in metadata["importance_ids"].items():
+                importanceData = self._fs.get(ObjectId(importanceId)).read()
+                
+                with io.BytesIO(importanceData) as input_buffer:
+                    importance = torch.load(input_buffer)
 
-        for k, importanceId in metadata["importance_ids"].items():
-            importanceData = self._fs.get(ObjectId(importanceId)).read()
-            
-            with io.BytesIO(importanceData) as input_buffer:
-                importance = torch.load(input_buffer)
-
-            importanceMap[k] = importance
+                importanceMap[k] = importance
 
         return Sample(image, importanceMap, metadata["annotation"])
 
@@ -245,7 +255,8 @@ class DataManager:
             with session.start_transaction():
 
                 image_id = metadata['_id']
-                importance_ids = metadata.get('importance_ids').values()
+
+                importance_ids = metadata.get('importance_ids', {}).values() if 'importance_ids' in metadata else []
 
                 imageLength = self._db.fs.files.find_one({'_id': ObjectId(image_id)})['length']
 

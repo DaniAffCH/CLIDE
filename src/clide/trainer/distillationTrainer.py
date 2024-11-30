@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class UltralyticsTrainer(DetectionTrainer):
 
-    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, featureDistiller: FeatureDistillationManager, dataManager: DataManager, splitRatio: Dict[str, float], distillationAlpha: float, useSoftLabels: bool, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+    def __init__(self, studentModel: StudentModel, teacherPool: TeacherPool, featureDistiller: FeatureDistillationManager, dataManager: DataManager, splitRatio: Dict[str, float], distillationAlpha: float, useSoftLabels: bool, useFeatureDistillation: bool, useImportanceEstimation: bool, cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         cfg.plots = False
         cfg.augment = False
         cfg.workers = 0
@@ -58,6 +58,8 @@ class UltralyticsTrainer(DetectionTrainer):
         self.distillationAlpha = distillationAlpha
         self.featureDistiller = featureDistiller
         self.useSoftLabels = useSoftLabels
+        self.useFeatureDistillation = useFeatureDistillation
+        self.useImportanceEstimation = useImportanceEstimation
         
         self.studentModel.model.model.args = self.args        
         self.set_criterion(self.studentModel)
@@ -145,7 +147,7 @@ class UltralyticsTrainer(DetectionTrainer):
         return optimizer
 
     def set_criterion(self, student: StudentModel):
-        student.model.model.criterion = KDv8DetectionLoss(student.model.model, self.useSoftLabels)
+        student.model.model.criterion = KDv8DetectionLoss(student.model.model, softLabels = self.useSoftLabels)
 
     @override
     def get_dataset(self):
@@ -260,15 +262,22 @@ class UltralyticsTrainer(DetectionTrainer):
                     teacherFeatures = adaptedFeatures["teacher"]
                     studentFeatures = adaptedFeatures["student"]
 
-                    imitationLoss = 0
-
-                    for (sf_key, sf), (tf_key, tf) in zip(studentFeatures.items(), teacherFeatures.items()):
-                        assert sf_key == tf_key, "Keys do not match for student and teacher features"
-                        importance = batch["importance_map"][self.teacherModel.name].to(sf.device)
-                        imitationLoss = imitationLoss + (importance*(sf - tf) ** 2).mean()
-
-                    imitationLoss = imitationLoss * self.distillationAlpha
+                    imitationLoss = torch.tensor(0.0, device=self.model.args.device, dtype=torch.float32)
                     
+                    if self.useFeatureDistillation:
+                        for (sf_key, sf), (tf_key, tf) in zip(studentFeatures.items(), teacherFeatures.items()):
+                            assert sf_key == tf_key, "Keys do not match for student and teacher features"
+                            
+                            fmse = (sf - tf) ** 2
+                            
+                            if self.useImportanceEstimation:
+                                importance = batch["importance_map"][self.teacherModel.name].to(sf.device)
+                                fmse = importance * fmse
+                            
+                            imitationLoss = imitationLoss + fmse.mean()
+
+                        imitationLoss = imitationLoss * self.distillationAlpha
+                        
                     self.loss = self.loss + imitationLoss
 
                 # Backward
