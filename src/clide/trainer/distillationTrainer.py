@@ -11,7 +11,6 @@ from ultralytics.models.yolo.detect import DetectionTrainer
 from ultralytics.utils.torch_utils import autocast
 from copy import copy
 from torch import optim, nn
-import torch.nn.functional as F
 import numpy as np
 import torch
 import time
@@ -44,11 +43,14 @@ class UltralyticsTrainer(DetectionTrainer):
         cfg.fliplr=0.
         cfg.erasing=0.
         cfg.crop_fraction=0.
-        
+                
         cfg.model = studentModel.model.model.args["model"]
         cfg.device =  studentModel.model.model.args["device"]
         
-        super().__init__(cfg, overrides, _callbacks)
+        super().__init__(cfg, overrides)
+        
+        # Needed to get rid of integration callbacks
+        self.callbacks = _callbacks
         
         self.dataManager = dataManager
         self.teacherPool = teacherPool
@@ -60,6 +62,7 @@ class UltralyticsTrainer(DetectionTrainer):
         self.useSoftLabels = useSoftLabels
         self.useFeatureDistillation = useFeatureDistillation
         self.useImportanceEstimation = useImportanceEstimation
+        self._callbacks = _callbacks
         
         self.studentModel.model.model.args = self.args        
         self.set_criterion(self.studentModel)
@@ -68,13 +71,16 @@ class UltralyticsTrainer(DetectionTrainer):
         self.reviewerModels = None
         
     def updateTeacherReviewers(self):
-        self.teacherModel, self.reviewerModels = self.teacherPool.teacherReviewersSplit()
+        # getting all models as evaluators. Is this better than split?
+        self.teacherModel = self.teacherPool.getRandomModel()
+        self.reviewerModels = self.teacherPool.getAllModels()
+        # self.teacherModel, self.reviewerModels = self.teacherPool.teacherReviewersSplit()
         logger.info(f"Teacher Model: {self.teacherModel.name}")
         logger.info(f"Reviewer Models: " + ", ".join([reviewerModel.name for reviewerModel in self.reviewerModels]))
 
     def updateDataset(self):
         self.datasetFactory.updateData()
-
+        
     @override
     def build_optimizer(self, model, name="auto", lr=0.001, momentum=0.9, decay=1e-5, iterations=1e5):
         """
@@ -178,7 +184,6 @@ class UltralyticsTrainer(DetectionTrainer):
     def _do_train(self, world_size=1):
         """Train completed, evaluate and plot if specified by arguments."""
         self.featureDistiller.updateAllHooks()
-        self.updateDataset()
         self.updateTeacherReviewers()
 
         if world_size > 1:
@@ -327,7 +332,7 @@ class UltralyticsTrainer(DetectionTrainer):
                 self.save_metrics(metrics={**self.label_loss_items(self.tloss), **self.metrics, **self.lr})
                 self.stop |= self.stopper(epoch + 1, self.fitness) or final_epoch
                 if self.args.time:
-                    self.stop |= (time.time() - self.train_time_start) > (self.args.time * 3600)
+                    self.stop |= (time.time() - self.train_time_start) > (self.args.time * 3600)                
 
                 # Save model
                 if self.args.save or final_epoch:
@@ -373,4 +378,4 @@ class UltralyticsTrainer(DetectionTrainer):
         self.run_callbacks("teardown")
 
     def getResultMetric(self):
-        return self.metrics["metrics/mAP50-95(B)"]
+        return self.best_fitness

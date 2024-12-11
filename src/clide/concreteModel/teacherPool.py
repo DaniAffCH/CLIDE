@@ -31,5 +31,8 @@ class TeacherPool:
         reviewers = [model for model in self._pool.values() if model != teacher]
         return teacher, reviewers
     
+    def getAllModels(self) -> List[TeacherModel]:
+        return list(self._pool.values())
+    
     def __iter__(self) -> Iterator[TeacherModel]:
         return iter(self._pool.values())

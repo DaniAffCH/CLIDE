@@ -1,0 +1,4 @@
+wandb:
+  project: "CLIDE"
+  entity: "danieleaffinita2000"
+  run_name: "AblationPlain"

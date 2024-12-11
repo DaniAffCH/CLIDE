@@ -13,6 +13,9 @@ import numpy as np
 import logging
 import torch
 import time
+import wandb
+import random
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +26,7 @@ class Sample:
     annotation: int 
 
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, useImportanceEstimation: bool, cleanFirst: bool = False) -> None:
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, useImportanceEstimation: bool, _callbacks, cleanFirst: bool = False) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
         self.dbName = dbName
         self._teacherPool = teacherPool
@@ -40,6 +43,7 @@ class DataManager:
         self._updateRate = updateRate # in seconds 
         self._unusedRatioThreshold = unusedRatioThreshold
         self._useImportanceEstimation = useImportanceEstimation
+        self._callbacks = _callbacks
         assert 0. <= unusedRatioThreshold <= 1., "unusedRatioThreshold must be between 0 and 1 (included)"
         self._minCollectingTime = minCollectingTime
 
@@ -49,8 +53,18 @@ class DataManager:
 
         logger.info(f"Connection to db established")
         self.checkAndRestoreConsistency()
-
-
+        
+    def getNumSamples(self) -> int:
+        return self._db.metadata.count_documents({})
+        
+        
+    def run_callbacks(self, callback:str):
+        # TODO: should be a parameter
+        if time.time() - self._loggingTimer > 15 and wandb:
+            self._loggingTimer = time.time()
+            for callbackHandler in self._callbacks[callback]:
+                callbackHandler(self)
+        
     def startCollectionSession(self):
         self._collectionTimer = time.time()
 
@@ -82,15 +96,11 @@ class DataManager:
         '''
         total_images = self._db.metadata.count_documents({})
         unused_images = self._db.metadata.count_documents({"used": False})
-
+        
         if total_images == 0:
             return 0.0  
         
         ratio = unused_images / total_images
-
-        if time.time() - self._loggingTimer > 16:
-            logger.info(f"New samples ratio {ratio:.3f} (threshold {self._unusedRatioThreshold})")
-            self._loggingTimer = time.time()
 
         return ratio
 
@@ -108,8 +118,9 @@ class DataManager:
             used_files.add(str(image_id))  # Add image _id to used_files
             
             # Add all importance_id values to used_files
-            for importance_id in metadata['importance_ids'].values():
-                used_files.add(str(importance_id))  # Add importance_id to used_files
+            if "importance_ids" in metadata:
+                for importance_id in metadata['importance_ids'].values():
+                    used_files.add(str(importance_id))  # Add importance_id to used_files
 
         # Get all file IDs in fs.files
         fs_files = self._db.fs.files.find()
@@ -191,7 +202,8 @@ class DataManager:
                         'filename': imageName,
                         'upload_date': datetime.now(),
                         'annotation': annotation,
-                        'used': False
+                        'used': False,
+                        'usedForTraining': False
                     }
                     
                     if self._useImportanceEstimation:
@@ -199,6 +211,8 @@ class DataManager:
                         metadata['importance_ids'] = importanceIds
                         
                     self._db.metadata.insert_one(metadata)
+                    
+            self.run_callbacks("on_data_update")
 
     def getSample(self, imageId) -> Sample:
         imageData = self._fs.get(ObjectId(imageId)).read()
@@ -230,10 +244,52 @@ class DataManager:
         for doc in cursor:
             dataset.append(str(doc['_id']))
 
-        # Update all images' "used" field to True
         self._db.metadata.update_many({}, {"$set": {"used": True}})
 
         return dataset
+    
+    def getForValidation(self, n: int) -> List[str]:
+        '''
+        Returns a List of n sample ids where the field "usedForTraining" is False.
+        '''
+        # Fetch samples that have "usedForTraining" as False
+        cursor = self._db.metadata.find({"usedForTraining": False}, {'_id': 1})
+        all_ids = [doc['_id'] for doc in cursor]
+        
+        # If there are less samples than requested, return all
+        val_ids = random.sample(all_ids, min(n, len(all_ids)))
+        
+        self._db.metadata.update_many(
+            {"_id": {"$in": val_ids}},
+            {"$set": {"used": True}}
+        )
+    
+        return list(map(str,val_ids))
+
+    def getForTraining(self, n: int, validationSet: List[str] = []) -> List[str]:
+        '''
+        Returns a List of n sample ids where the field "usedForTraining" is False,
+        and updates their "usedForTraining" field to True.
+        '''
+        cursor = self._db.metadata.find({}, {'_id': 1})
+        # Make sure that train and val remains disjointed
+        all_ids = [doc['_id'] for doc in cursor if str(doc["_id"]) not in validationSet]
+        
+        # Select random samples
+        selected_ids = random.sample(all_ids, min(n, len(all_ids)))
+        
+        # Update the selected samples' "usedForTraining" field to True
+        self._db.metadata.update_many(
+            {"_id": {"$in": selected_ids}},
+            {"$set": {"usedForTraining": True}}
+        )
+
+        self._db.metadata.update_many(
+            {"_id": {"$in": selected_ids}},
+            {"$set": {"used": True}}
+        )
+        
+        return list(map(str, selected_ids))
 
     def stopCollecting(self) -> bool:
         minTimeElapsed = time.time() - self._collectionTimer > self._minCollectingTime

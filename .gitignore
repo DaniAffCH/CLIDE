@@ -401,4 +401,6 @@ FodyWeavers.xsd
 outputs
 src/runs
 *.pt
+*.pth
 debug/*
+src/wandb

@@ -1,4 +1,6 @@
 from enum import Enum
+
+from numpy import isin
 from clide.abstractModel.studentModel import StudentModel
 from ultralytics import YOLO
 from overrides import override
@@ -6,7 +8,7 @@ from transformers.image_utils import ImageInput
 from clide.adapters.tasks import KeyMapping, TaskType, TaskResult, TaskFactory
 from clide.adapters.classes import ClassAdapter
 import torch
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ class Yolo(StudentModel):
         modelType = YoloModelType[modelType].value
         name = modelType.split(".")[0]
         
-        model = YOLO(modelType, "detect")
+        model = YOLO(modelType, task="detect")
 
         super().__init__(model, name, hookLayers)
 
@@ -72,5 +74,9 @@ class Yolo(StudentModel):
         torch.save(self.model.model.model.state_dict(), path)
                    
     @override
-    def loadWeights(self, path: str):
-        self.model.model.model.load_state_dict(torch.load(path, weights_only=True))
+    def loadWeights(self, weights: Union[str, dict]):
+        if isinstance(weights, str):
+            self.model = YOLO(weights, task="detect")
+        elif isinstance(weights, dict):
+            self.model.model.model.load_state_dict(weights)
+            
