@@ -104,6 +104,7 @@ def main(cfg: DictConfig):
         student = hydra.utils.instantiate(cfg.student)
         student.loadWeights("model_tmp.pth")
         featureDistiller.updateModel(student)
+        sessionNumber += 1
 
 
 if __name__ == "__main__":
