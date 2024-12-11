@@ -55,6 +55,7 @@ def main(cfg: DictConfig):
     deployer = hydra.utils.instantiate(cfg.deployer, studentModel=student)
 
     bestMetric = 0
+    bestModelPath = None
     sessionNumber = 0
 
     while True:
@@ -67,12 +68,17 @@ def main(cfg: DictConfig):
         trainer.train()
         
         currentMetric = trainer.getResultMetric()
-        baselineMetric = trainer.validator(None, "yolov8n.pt")
+        baselineMetric = trainer.validator(None, "yolov8n.pt")["fitness"]
+        
+        if bestMetric > 0:
+            # Update the best model metric on the current data distribution
+            bestMetric = trainer.validator(None, bestModelPath)["fitness"]
 
         with tempfile.TemporaryDirectory() as temp_dir:
             if currentMetric > bestMetric:
                 logger.info(f"Monitor Metric improved passing from {bestMetric} to {currentMetric}")
                 bestMetric = currentMetric
+                bestModelPath = trainer.best
                 
                 # Quantize
                 #qStudentPath = quantizer.quantize(student, temp_dir, dataset=trainer.build_dataset(None, mode="val"))
