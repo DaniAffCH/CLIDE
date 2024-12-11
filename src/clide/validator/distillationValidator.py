@@ -16,7 +16,8 @@ from ultralytics.utils.metrics import ConfusionMatrix
 class UltralyticsValidator(DetectionValidator):
     def __init__(self, reviewerModels: List[TeacherModel], dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
         self.reviewerModels = reviewerModels
-        super().__init__(dataloader, save_dir, pbar, args, _callbacks)
+        super().__init__(dataloader, save_dir, pbar, args)
+        self._callbacks = _callbacks
 
     def init_metrics(self, model):
         """Initialize evaluation metrics for YOLO."""
@@ -76,7 +77,6 @@ class UltralyticsValidator(DetectionValidator):
             self.args.plots &= trainer.stopper.possible_stop or (trainer.epoch == trainer.epochs - 1)
             model.eval()
         else:
-            callbacks.add_integration_callbacks(self)
             model = AutoBackend(
                 weights=model or self.args.model,
                 device=select_device(self.args.device, self.args.batch),

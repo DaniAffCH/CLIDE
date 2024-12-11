@@ -12,6 +12,7 @@ import io
 import numpy as np
 import logging
 import torch
+import wandb
 import time
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ class Sample:
     annotation: int 
 
 class DataManager:
-    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, useImportanceEstimation: bool, cleanFirst: bool = False) -> None:
+    def __init__(self, dbUri: str, dbName: str, teacherPool: TeacherPool, maxSize: str, updateRate: int, unusedRatioThreshold: float, minCollectingTime: int, useImportanceEstimation: bool, _callbacks, cleanFirst: bool = False) -> None:
         logger.info(f"Connecting to dbUri: {dbUri} dbName: {dbName}")
         self.dbName = dbName
         self._teacherPool = teacherPool
@@ -40,6 +41,7 @@ class DataManager:
         self._updateRate = updateRate # in seconds 
         self._unusedRatioThreshold = unusedRatioThreshold
         self._useImportanceEstimation = useImportanceEstimation
+        self._callbacks = _callbacks
         assert 0. <= unusedRatioThreshold <= 1., "unusedRatioThreshold must be between 0 and 1 (included)"
         self._minCollectingTime = minCollectingTime
 
@@ -50,6 +52,15 @@ class DataManager:
         logger.info(f"Connection to db established")
         self.checkAndRestoreConsistency()
 
+    def getNumSamples(self) -> int:
+        return self._db.metadata.count_documents({})
+
+    def run_callbacks(self, callback:str):
+        # TODO: should be a parameter
+        if time.time() - self._loggingTimer > 15 and wandb:
+            self._loggingTimer = time.time()
+            for callbackHandler in self._callbacks[callback]:
+                callbackHandler(self)
 
     def startCollectionSession(self):
         self._collectionTimer = time.time()
@@ -80,18 +91,13 @@ class DataManager:
         '''
         Returns the ratio of images where "used" is False.
         '''
-        total_images = self._db.metadata.count_documents({})
+        total_images = self.getNumSamples()
         unused_images = self._db.metadata.count_documents({"used": False})
 
         if total_images == 0:
             return 0.0  
         
         ratio = unused_images / total_images
-
-        if time.time() - self._loggingTimer > 16:
-            logger.info(f"New samples ratio {ratio:.3f} (threshold {self._unusedRatioThreshold})")
-            self._loggingTimer = time.time()
-
         return ratio
 
     def checkAndRestoreConsistency(self):
@@ -108,8 +114,9 @@ class DataManager:
             used_files.add(str(image_id))  # Add image _id to used_files
             
             # Add all importance_id values to used_files
-            for importance_id in metadata['importance_ids'].values():
-                used_files.add(str(importance_id))  # Add importance_id to used_files
+            if "importance_ids" in metadata:
+                for importance_id in metadata['importance_ids'].values():
+                    used_files.add(str(importance_id))
 
         # Get all file IDs in fs.files
         fs_files = self._db.fs.files.find()
@@ -199,6 +206,7 @@ class DataManager:
                         metadata['importance_ids'] = importanceIds
                         
                     self._db.metadata.insert_one(metadata)
+                    self.run_callbacks("on_data_update")
 
     def getSample(self, imageId) -> Sample:
         imageData = self._fs.get(ObjectId(imageId)).read()

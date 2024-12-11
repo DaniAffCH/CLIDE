@@ -48,7 +48,7 @@ class UltralyticsTrainer(DetectionTrainer):
         cfg.model = studentModel.model.model.args["model"]
         cfg.device =  studentModel.model.model.args["device"]
         
-        super().__init__(cfg, overrides, _callbacks)
+        super().__init__(cfg, overrides)
         
         self.dataManager = dataManager
         self.teacherPool = teacherPool
@@ -60,6 +60,7 @@ class UltralyticsTrainer(DetectionTrainer):
         self.useSoftLabels = useSoftLabels
         self.useFeatureDistillation = useFeatureDistillation
         self.useImportanceEstimation = useImportanceEstimation
+        self.callbacks = _callbacks
         
         self.studentModel.model.model.args = self.args        
         self.set_criterion(self.studentModel)
@@ -178,7 +179,6 @@ class UltralyticsTrainer(DetectionTrainer):
     def _do_train(self, world_size=1):
         """Train completed, evaluate and plot if specified by arguments."""
         self.featureDistiller.updateAllHooks()
-        self.updateDataset()
         self.updateTeacherReviewers()
 
         if world_size > 1:
@@ -373,4 +373,4 @@ class UltralyticsTrainer(DetectionTrainer):
         self.run_callbacks("teardown")
 
     def getResultMetric(self):
-        return self.metrics["metrics/mAP50-95(B)"]
+        return self.best_fitness

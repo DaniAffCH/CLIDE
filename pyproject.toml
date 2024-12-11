@@ -31,5 +31,6 @@ dependencies = [
     "paramiko",
     "scp",
     "model-compression-toolkit>=2.2.0",
-    "sony_custom_layers"
+    "sony_custom_layers",
+    "wandb"
 ]

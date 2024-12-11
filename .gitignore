@@ -402,3 +402,4 @@ outputs
 src/runs
 *.pt
 debug/*
+src/wandb

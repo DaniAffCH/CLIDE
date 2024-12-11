@@ -9,3 +9,4 @@ defaults:
   - trainer: ultralyticsFeatures
   - quantizer: mct
   - deployer: dummy
+  - logger: wandb
