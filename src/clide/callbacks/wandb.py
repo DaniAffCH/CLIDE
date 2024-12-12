@@ -181,6 +181,8 @@ class WandbCallbacks:
         batch = next(iter(dataloader))    
         images = batch["img"]
         
+        n = min(n, images.shape[0])
+        
         for i in range(n):
             npimg = np.ascontiguousarray(images[i].cpu().numpy().transpose(1, 2, 0))
             res = model.model(npimg)
