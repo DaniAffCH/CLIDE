@@ -8,20 +8,13 @@ import numpy as np
 from typing import Generator
 import logging
 import urllib
-import requests
-import time
-import re
 
 logger = logging.getLogger(__name__)
 
-class M3U8Collector(RemoteCollector):
-    def __init__(self, address: str, deviceName: str, dataManager: DataManager, streamEndpointTemplate: str, tokenRegex: str, bufferSize: int):
+class CGICollector(RemoteCollector):
+    def __init__(self, address: str, deviceName: str, dataManager: DataManager, bufferSize: int):
         super().__init__(address, deviceName, dataManager)
         self.lastTokenRefresh = None
-        self.streamEndpointTemplate = streamEndpointTemplate
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edge/115.0.0.0"
-        }
         self.bufferSize = bufferSize
         self.currentCap = None
         
@@ -36,34 +29,9 @@ class M3U8Collector(RemoteCollector):
         self._isConnected = True
         
         return self._isConnected
-
-    def _refreshToken(self) -> str:
-        response = requests.get(self.address, headers=self.headers)
-        
-        if not response.ok:
-            raise AssertionError(f"Failed to load {self.address}. Error Code {response}")
-                    
-        m3u8_match = re.search(r'livee.m3u8\?a=([\w\d]+)', response.text)
-        if not m3u8_match:
-            return ""
-            #raise Exception("Failed to find the streaming URL.")
-
-        token = m3u8_match.group(1)
-        
-        if self.lastTokenRefresh is not None:
-            timeElapsed = time.time() - self.lastTokenRefresh
-            logger.info(f"Token refreshed after {timeElapsed}s")
-            self.lastTokenRefresh = time.time()
-            
-        return token
-        
     
     def _getCap(self) -> cv.VideoCapture:
-        token = self._refreshToken()
-        
-        streamEndpoint = self.streamEndpointTemplate.format(token)
-        
-        cap = cv.VideoCapture(streamEndpoint)
+        cap = cv.VideoCapture(self.address)
         cap.set(cv.CAP_PROP_BUFFERSIZE, self.bufferSize)
         
         return cap 
@@ -77,7 +45,7 @@ class M3U8Collector(RemoteCollector):
             
             if not ret:
                 # Token expired!
-                logger.info("M3U8 Token expired!")
+                logger.info("CAP closed!")
                 self.currentCap = self._getCap()
                 
             else:
@@ -90,7 +58,7 @@ class M3U8Collector(RemoteCollector):
             retCode = urllib.request.urlopen(self.address).getcode()
             
             if retCode != 200:
-                logger.warning(f"M3U8 connector, address {self.address} returned code {retCode}")
+                logger.warning(f"CGI connector, address {self.address} returned code {retCode}")
                 return False
             else:
                 return True

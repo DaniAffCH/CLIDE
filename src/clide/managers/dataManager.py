@@ -47,7 +47,7 @@ class DataManager:
 
         # |-_|
         if self._useImportanceEstimation:
-            self.importanceDistiller = ImportanceDistiller([(1,1),(2,2),(4,4),(8,8),(16,16)], [0.5,0.6,0.6,0.7,0.7], 640, 64)
+            self.importanceDistiller = ImportanceDistiller([(1,1),(2,2),(4,4),(8,8),(16,16)], [0.5,0.6,0.6,0.7,0.7], 640, 64, "minmax")
 
         logger.info(f"Connection to db established")
         self.checkAndRestoreConsistency()

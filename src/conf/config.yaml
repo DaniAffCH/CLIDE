@@ -6,7 +6,7 @@ defaults:
   - student: yolo8n
   - datamanager: mongolocal
   - collector: local
-  - trainer: ultralyticsFeatures
+  - trainer: ultralyticsConfidence
   - quantizer: mct
   - deployer: dummy
   - logger: wandb

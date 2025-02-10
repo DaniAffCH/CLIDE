@@ -1,7 +1,6 @@
 _target_: clide.concreteConnector.collector.m3u8Collector.M3U8Collector
 
-address: "daxpytip1dec23.ddns.net"
-deviceName: "DaxpyXXSettembre"
+address: "https://www.skylinewebcams.com/it/webcam/italia/lazio/roma/roma-largo-di-torre-argentina.html"
+deviceName: "LiveWebCam Torre Argentina"
 streamEndpointTemplate: "https://hd-auth.skylinewebcams.com/live.m3u8?a={}"
-tokenRegex: ""
 bufferSize: 30 

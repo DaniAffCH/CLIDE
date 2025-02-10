@@ -1,0 +1,5 @@
+_target_: clide.concreteConnector.collector.cgiCollector.CGICollector
+
+address: "http://79.3.91.147:9002/axis-cgi/mjpg/video.cgi" 
+deviceName: "LiveWebCam Torre Argentina 2"
+bufferSize: 1

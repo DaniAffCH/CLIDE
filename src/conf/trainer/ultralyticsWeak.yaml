@@ -1,0 +1,14 @@
+_target_: clide.trainer.distillationTrainer.UltralyticsTrainer
+
+distillationAlpha: 0.1
+useSoftLabels: True
+useFeatureDistillation: True
+useImportanceEstimation: True
+
+splitRatio: 
+    train: 0.75
+    val: 0.25
+
+overrides:
+    patience: 5
+    epochs: 30

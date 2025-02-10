@@ -43,7 +43,7 @@ def main(cfg: DictConfig):
     teachers = [hydra.utils.instantiate(teacher) for teacher in cfg.teachers.values()]
     teacherPool = TeacherPool(teachers)
 
-    student = hydra.utils.instantiate(cfg.student)
+    student = hydra.utils.instantiate(cfg.student)    
 
     dataManager = hydra.utils.instantiate(cfg.datamanager, teacherPool=teacherPool, useImportanceEstimation=cfg.trainer.useImportanceEstimation, _callbacks=callbacks)
     featureDistiller = FeatureDistillationManager(student, teacherPool)
@@ -105,6 +105,7 @@ def main(cfg: DictConfig):
         student.loadWeights("model_tmp.pth")
         featureDistiller.updateModel(student)
         sessionNumber += 1
+        exit(0)
 
 
 if __name__ == "__main__":
