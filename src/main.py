@@ -105,8 +105,6 @@ def main(cfg: DictConfig):
         student.loadWeights("model_tmp.pth")
         featureDistiller.updateModel(student)
         sessionNumber += 1
-        exit(0)
-
 
 if __name__ == "__main__":
     main()

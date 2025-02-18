@@ -29,14 +29,14 @@ class FileCollector(RemoteCollector):
         if not self.isAlive():
             raise AssertionError(f"{self.imagesPath}: No such directory")
         self._pathIter = iter(sorted(Path(self.imagesPath).iterdir(), key=os.path.getmtime))
-        
+
         logger.info(f"Fake connection to {self.imagesPath} established.")
 
         self._isConnected = True
         return self._isConnected
     
     def _isImage(self, path: Path):
-        return path.suffix.lower() in ['.png', '.jpg', '.jpeg']
+        return not path.is_dir() and path.suffix.lower() in ['.png', '.jpg', '.jpeg']
         
     @override
     def _pollData(self) -> Generator[np.ndarray, None, None]:
